@@ -1,6 +1,7 @@
 /// Example showing Polars DataFrame integration
 
-use infer::prelude::*;
+use infer_lib::prelude::*;
+use infer_lib::output_to_series;
 use polars::prelude::*;
 
 fn main() -> Result<()> {
@@ -11,41 +12,28 @@ fn main() -> Result<()> {
     println!("Created sample DataFrame:");
     println!("{}\n", df);
 
-    // Example 1: Convert DataFrame to ModelInput
+    // Example 1: Create ModelInput from DataFrame
     {
         println!("--- Example 1: DataFrame to ModelInput ---");
 
-        let input = df.to_model_input()?;
+        let input = ModelInput(df.clone());
 
-        if let ModelInput::Dense {
-            num_rows,
-            num_features,
-            ..
-        } = &input
-        {
-            println!("✓ Converted DataFrame to dense input");
-            println!("  Shape: {} rows × {} features", num_rows, num_features);
-        }
+        println!("✓ Created ModelInput from DataFrame");
+        println!("  Shape: {} rows × {} features", input.0.height(), input.0.width());
     }
 
     println!();
 
-    // Example 2: Select specific columns
+    // Example 2: Convert DataFrame to dense for backends without native Polars support
     {
-        println!("--- Example 2: Select Specific Columns ---");
+        println!("--- Example 2: DataFrame to Dense Conversion ---");
 
-        let columns = ["feature1", "feature2"];
-        let input = df.to_model_input_with_columns(&columns)?;
+        use infer_lib::polars_ext::dataframe_to_dense_f32;
+        let (data, num_rows, num_features) = dataframe_to_dense_f32(&df)?;
 
-        if let ModelInput::Dense {
-            num_rows,
-            num_features,
-            ..
-        } = &input
-        {
-            println!("✓ Selected columns: {:?}", columns);
-            println!("  Shape: {} rows × {} features", num_rows, num_features);
-        }
+        println!("✓ Converted to dense f32 array");
+        println!("  Shape: {} rows × {} features", num_rows, num_features);
+        println!("  Data length: {}", data.len());
     }
 
     println!();
@@ -55,7 +43,7 @@ fn main() -> Result<()> {
         println!("--- Example 3: Full Workflow ---");
         println!("1. Load data into Polars DataFrame");
         println!("2. Preprocess/feature engineering in Polars");
-        println!("3. Convert to ModelInput");
+        println!("3. Create ModelInput");
         println!("4. Run inference");
         println!("5. Convert predictions back to Polars Series");
         println!();
@@ -104,14 +92,20 @@ fn main() -> Result<()> {
     // Example 5: Data type support
     {
         println!("--- Example 5: Supported Data Types ---");
-        println!("The library automatically converts Polars dtypes to f32:");
+        println!("The library automatically converts Polars dtypes:");
         println!("  ✓ Float32, Float64");
         println!("  ✓ Int8, Int16, Int32, Int64");
         println!("  ✓ UInt8, UInt16, UInt32, UInt64");
         println!("  ✓ Boolean (true=1.0, false=0.0)");
         println!();
-        println!("Unsupported types will return an error:");
-        println!("  ✗ String, Categorical, Date, Datetime, List, Struct");
+        println!("For backends with native Polars support (CatBoost, XGBoost, LightGBM):");
+        println!("  - DataFrames are passed directly via Apache Arrow");
+        println!("  - Zero-copy data transfer");
+        println!("  - Supports categorical columns (where backend allows)");
+        println!();
+        println!("For other backends (Perpetual, ONNX, Candle):");
+        println!("  - DataFrame is converted to dense arrays internally");
+        println!("  - String/categorical columns will cause an error");
     }
 
     println!("\n✓ Polars integration example completed");

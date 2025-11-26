@@ -1,6 +1,6 @@
 /// Example showing parallel inference on multiple models
 
-use infer::prelude::*;
+use infer_lib::prelude::*;
 use std::time::Instant;
 
 fn main() -> Result<()> {
@@ -15,27 +15,22 @@ fn main() -> Result<()> {
 
     // Example 1: Different inputs for different models
     {
+        use polars::prelude::*;
+
         println!("1. predict_many: Different inputs for different models");
         println!("   Useful for batch processing where each model gets its own input\n");
 
-        let model_ids = vec!["model1", "model2", "model3"];
-        let inputs = vec![
-            ModelInput::Dense {
-                data: vec![1.0, 2.0],
-                num_rows: 1,
-                num_features: 2,
-            },
-            ModelInput::Dense {
-                data: vec![3.0, 4.0],
-                num_rows: 1,
-                num_features: 2,
-            },
-            ModelInput::Dense {
-                data: vec![5.0, 6.0],
-                num_rows: 1,
-                num_features: 2,
-            },
-        ];
+        // Create sample DataFrames
+        // let df1 = df! { "a" => [1.0f32], "b" => [2.0f32] }.unwrap();
+        // let df2 = df! { "a" => [3.0f32], "b" => [4.0f32] }.unwrap();
+        // let df3 = df! { "a" => [5.0f32], "b" => [6.0f32] }.unwrap();
+        //
+        // let model_ids = vec!["model1", "model2", "model3"];
+        // let inputs = vec![
+        //     ModelInput(df1),
+        //     ModelInput(df2),
+        //     ModelInput(df3),
+        // ];
 
         // This would run inference in parallel using rayon
         // let results = registry.predict_many(&model_ids, &inputs);
@@ -56,15 +51,19 @@ fn main() -> Result<()> {
 
     // Example 2: Same input broadcast to multiple models
     {
+        use polars::prelude::*;
+
         println!("2. predict_broadcast: Same input to multiple models");
         println!("   Useful for A/B testing or model ensembling\n");
 
-        let model_ids = vec!["modelA", "modelB", "modelC"];
-        let input = ModelInput::Dense {
-            data: vec![1.0, 2.0, 3.0, 4.0],
-            num_rows: 2,
-            num_features: 2,
-        };
+        // Create sample DataFrame
+        // let df = df! {
+        //     "feature1" => [1.0f32, 2.0],
+        //     "feature2" => [3.0f32, 4.0],
+        // }.unwrap();
+        //
+        // let model_ids = vec!["modelA", "modelB", "modelC"];
+        // let input = ModelInput(df);
 
         // This would broadcast the same input to all models in parallel
         // let results = registry.predict_broadcast(&model_ids, &input);

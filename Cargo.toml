@@ -1,15 +1,18 @@
-[package]
-name = "infer"
+[workspace]
+members = [
+    "lib",
+    "pipeline",
+]
+resolver = "2"
+
+[workspace.package]
 version = "0.1.0"
-edition = "2024"
-description = "High-performance ML inference library supporting CatBoost, XGBoost, and LightGBM with parallel execution and Polars integration"
+edition = "2021"
 license = "Apache-2.0"
-repository = "https://github.com/aryehlev/infer"
-keywords = ["machine-learning", "inference", "catboost", "xgboost", "lightgbm"]
-categories = ["science"]
+repository = "https://github.com/aryehlev/infer-lib"
 rust-version = "1.85"
 
-[dependencies]
+[workspace.dependencies]
 # Core dependencies
 arc-swap = "1.7"
 thiserror = "2.0"
@@ -23,27 +26,22 @@ catboost-rust = { path = "../catboost-rust", features = ["polars"] }
 xgboost-rust = { path = "../xgboost-rust", features = ["polars"] }
 lightgbm-rust = { path = "../lightgbm-rust", features = ["polars"] }
 
-# Optional perpetual support for future integration
-# perpetual = { version = "0.1", optional = true }
+# Perpetual gradient boosting
+perpetual = "0.4"
 
-[dev-dependencies]
-criterion = "0.5"
+# ONNX Runtime
+ort = { version = "2.0.0-rc.10", features = ["half"] }
 
-[features]
-default = ["catboost", "xgboost", "lightgbm"]
-catboost = []
-xgboost = []
-lightgbm = []
-# perpetual = ["dep:perpetual"]
+# Candle for transformers/LLMs
+candle-core = "0.8"
+candle-nn = "0.8"
+candle-transformers = "0.8"
 
-[[example]]
-name = "basic_usage"
-path = "examples/basic_usage.rs"
+# Supporting libraries
+image = "0.25"
+tokenizers = "0.20"
 
-[[example]]
-name = "parallel_inference"
-path = "examples/parallel_inference.rs"
-
-[[example]]
-name = "polars_integration"
-path = "examples/polars_integration.rs"
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3

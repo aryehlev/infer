@@ -4,6 +4,30 @@ use std::sync::Arc;
 use std::collections::HashMap;
 
 /// Trait for transforming Polars DataFrames before inference
+///
+/// DataFrameTransformers can be used in two ways:
+///
+/// 1. **Model-level transformers**: Attached to a model for required preprocessing
+///    that should always be applied (e.g., normalization the model was trained with).
+///    ```rust,ignore
+///    let model = XGBoostModel::load("model", "path")?
+///        .with_transformer(Arc::new(MyTransformer));
+///    ```
+///
+/// 2. **Pipeline-level transformers**: Used in `TransformStep` for flexible,
+///    composable workflows where different preprocessing may be needed.
+///    ```rust,ignore
+///    let pipeline = Pipeline::builder("workflow")
+///        .add_step(Arc::new(TransformStep::new(
+///            "transform",
+///            Arc::new(MyTransformer),
+///            "input",
+///            "output",
+///        )))
+///        .build();
+///    ```
+///
+/// **Best Practice**: Use model-level for required preprocessing, pipeline-level for flexible composition.
 pub trait DataFrameTransformer: Send + Sync {
     /// Apply transformation to the DataFrame
     fn transform(&self, df: DataFrame) -> Result<DataFrame>;
@@ -16,29 +40,48 @@ pub trait DataFrameTransformer: Send + Sync {
 pub type DynDataFrameTransformer = Arc<dyn DataFrameTransformer>;
 
 /// Input data for model inference
+///
+/// All models accept Polars DataFrames as input. Each backend handles
+/// DataFrame conversion internally (native Polars support or conversion to dense).
 #[derive(Debug, Clone)]
-pub enum ModelInput {
-    /// Dense float features as a flat vector (row-major format)
-    /// Shape: (num_rows, num_features)
-    Dense {
-        data: Vec<f32>,
-        num_rows: usize,
-        num_features: usize,
-    },
-
-    /// Polars DataFrame input (will be converted to dense format)
-    DataFrame(DataFrame),
-}
+pub struct ModelInput(pub DataFrame);
 
 /// Output from model inference
 #[derive(Debug, Clone)]
 pub enum ModelOutput {
-    /// Single predictions per row
+    /// Single numeric predictions per row (regression, binary classification)
     Single(Vec<f64>),
 
-    /// Multi-output predictions (e.g., multiclass probabilities)
+    /// Multi-output numeric predictions (multiclass probabilities)
     /// Shape: (num_rows, num_classes)
-    Multi { data: Vec<f64>, num_classes: usize },
+    Multi {
+        data: Vec<f64>,
+        num_classes: usize
+    },
+
+    /// Text output (LLM generation, translation)
+    Text(Vec<String>),
+
+    /// Single text output
+    TextSingle(String),
+
+    /// Embeddings/vectors (sentence embeddings, feature vectors)
+    Embeddings {
+        data: Vec<f32>,
+        embedding_dim: usize,
+    },
+
+    /// Token IDs (for tokenized output)
+    Tokens(Vec<Vec<i64>>),
+
+    /// Classification with labels
+    Classifications {
+        labels: Vec<String>,
+        scores: Vec<f64>,
+    },
+
+    /// Custom/mixed output
+    Custom(std::collections::HashMap<String, Vec<u8>>),
 }
 
 /// Result from model inference including optional metadata
@@ -65,19 +108,21 @@ pub struct InferenceMetadata {
 }
 
 impl ModelOutput {
-    /// Get the raw prediction data
-    pub fn as_slice(&self) -> &[f64] {
+    /// Get the raw prediction data (only for numeric outputs)
+    pub fn as_slice(&self) -> Option<&[f64]> {
         match self {
-            ModelOutput::Single(data) => data,
-            ModelOutput::Multi { data, .. } => data,
+            ModelOutput::Single(data) => Some(data),
+            ModelOutput::Multi { data, .. } => Some(data),
+            _ => None,
         }
     }
 
-    /// Convert to Vec
-    pub fn into_vec(self) -> Vec<f64> {
+    /// Convert to Vec (only for numeric outputs)
+    pub fn into_vec(self) -> Option<Vec<f64>> {
         match self {
-            ModelOutput::Single(data) => data,
-            ModelOutput::Multi { data, .. } => data,
+            ModelOutput::Single(data) => Some(data),
+            ModelOutput::Multi { data, .. } => Some(data),
+            _ => None,
         }
     }
 
@@ -86,6 +131,12 @@ impl ModelOutput {
         match self {
             ModelOutput::Single(data) => data.len(),
             ModelOutput::Multi { data, num_classes } => data.len() / num_classes,
+            ModelOutput::Text(texts) => texts.len(),
+            ModelOutput::TextSingle(_) => 1,
+            ModelOutput::Embeddings { data, embedding_dim } => data.len() / embedding_dim,
+            ModelOutput::Tokens(tokens) => tokens.len(),
+            ModelOutput::Classifications { labels, .. } => labels.len(),
+            ModelOutput::Custom(_) => 0,
         }
     }
 }
@@ -135,6 +186,9 @@ pub enum ModelBackend {
     CatBoost,
     XGBoost,
     LightGBM,
+    Perpetual,
+    ONNX,
+    Candle,
 }
 
 impl std::fmt::Display for ModelBackend {
@@ -143,6 +197,9 @@ impl std::fmt::Display for ModelBackend {
             ModelBackend::CatBoost => write!(f, "CatBoost"),
             ModelBackend::XGBoost => write!(f, "XGBoost"),
             ModelBackend::LightGBM => write!(f, "LightGBM"),
+            ModelBackend::Perpetual => write!(f, "Perpetual"),
+            ModelBackend::ONNX => write!(f, "ONNX"),
+            ModelBackend::Candle => write!(f, "Candle"),
         }
     }
 }

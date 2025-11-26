@@ -12,6 +12,9 @@ pub enum InferError {
     #[error("Invalid input shape: expected {expected}, got {actual}")]
     InvalidShape { expected: String, actual: String },
 
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
+
     #[error("Backend error (CatBoost): {0}")]
     CatBoostError(String),
 
@@ -20,6 +23,9 @@ pub enum InferError {
 
     #[error("Backend error (LightGBM): {0}")]
     LightGBMError(String),
+
+    #[error("Backend error (Perpetual): {0}")]
+    PerpetualError(String),
 
     #[error("Polars error: {0}")]
     PolarsError(String),
@@ -53,6 +59,13 @@ impl From<xgboost_rust::XGBoostError> for InferError {
 impl From<lightgbm_rust::LightGBMError> for InferError {
     fn from(err: lightgbm_rust::LightGBMError) -> Self {
         InferError::LightGBMError(err.to_string())
+    }
+}
+
+#[cfg(feature = "perpetual")]
+impl From<perpetual::errors::PerpetualError> for InferError {
+    fn from(err: perpetual::errors::PerpetualError) -> Self {
+        InferError::PerpetualError(err.to_string())
     }
 }
 

@@ -1,0 +1,32 @@
+[package]
+name = "infer-pipeline"
+version.workspace = true
+edition.workspace = true
+description = "Execution engine for building ML pipelines and RAG workflows with infer-lib"
+license.workspace = true
+repository.workspace = true
+keywords = ["machine-learning", "pipeline", "rag", "execution-engine", "workflow"]
+categories = ["science"]
+rust-version.workspace = true
+
+[dependencies]
+# Core lib
+infer-lib = { path = "../lib", default-features = false }
+
+# Core dependencies
+arc-swap.workspace = true
+thiserror.workspace = true
+rayon.workspace = true
+
+# Polars support
+polars.workspace = true
+
+[dev-dependencies]
+infer-lib = { path = "../lib", features = ["catboost", "xgboost", "lightgbm", "perpetual"] }
+
+[features]
+default = []
+
+[[example]]
+name = "pipeline_example"
+path = "examples/pipeline_example.rs"

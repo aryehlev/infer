@@ -1,6 +1,6 @@
 /// Basic usage example showing how to load models and run inference
 
-use infer::prelude::*;
+use infer_lib::prelude::*;
 
 fn main() -> Result<()> {
     println!("=== Infer Library: Basic Usage Example ===\n");
@@ -12,6 +12,8 @@ fn main() -> Result<()> {
     // Example 1: Load and register an XGBoost model
     #[cfg(feature = "xgboost")]
     {
+        use polars::prelude::*;
+
         println!("\n--- XGBoost Example ---");
 
         // Load model from file (replace with your actual model path)
@@ -19,15 +21,15 @@ fn main() -> Result<()> {
         // registry.register("xgb_model".to_string(), model);
         // println!("✓ Registered XGBoost model");
 
-        // Create sample input data
-        let input = ModelInput::Dense {
-            data: vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-            num_rows: 2,
-            num_features: 3,
-        };
+        // Create sample DataFrame input
+        // let df = df! {
+        //     "feature1" => [1.0f32, 2.0],
+        //     "feature2" => [3.0f32, 4.0],
+        //     "feature3" => [5.0f32, 6.0],
+        // }?;
 
         // Run inference
-        // let output = registry.predict("xgb_model", &input)?;
+        // let output = registry.predict("xgb_model", &ModelInput(df))?;
         // println!("Predictions: {:?}", output.as_slice());
 
         println!("(Skipped - no model file provided)");

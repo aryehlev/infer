@@ -1,0 +1,61 @@
+[package]
+name = "infer-lib"
+version.workspace = true
+edition.workspace = true
+description = "High-performance ML inference library supporting CatBoost, XGBoost, LightGBM, Perpetual, ONNX, and Candle"
+license.workspace = true
+repository.workspace = true
+keywords = ["machine-learning", "inference", "ml", "onnx", "transformers"]
+categories = ["science"]
+rust-version.workspace = true
+
+[dependencies]
+# Core dependencies
+arc-swap.workspace = true
+thiserror.workspace = true
+rayon.workspace = true
+
+# Polars support
+polars.workspace = true
+
+# ML backends
+catboost-rust = { workspace = true, optional = true }
+xgboost-rust = { workspace = true, optional = true }
+lightgbm-rust = { workspace = true, optional = true }
+perpetual = { workspace = true, optional = true }
+ort = { workspace = true, optional = true }
+
+# Candle for transformers
+candle-core = { workspace = true, optional = true }
+candle-nn = { workspace = true, optional = true }
+candle-transformers = { workspace = true, optional = true }
+
+# Image loading for vision models
+image = { version = "0.25", optional = true }
+
+# Tokenizers for NLP models
+tokenizers = { version = "0.20", optional = true }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[features]
+default = ["catboost", "xgboost", "lightgbm", "perpetual"]
+catboost = ["dep:catboost-rust"]
+xgboost = ["dep:xgboost-rust"]
+lightgbm = ["dep:lightgbm-rust"]
+perpetual = ["dep:perpetual"]
+onnx = ["dep:ort", "dep:image", "dep:tokenizers"]
+candle = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:tokenizers"]
+
+[[example]]
+name = "basic_usage"
+path = "examples/basic_usage.rs"
+
+[[example]]
+name = "parallel_inference"
+path = "examples/parallel_inference.rs"
+
+[[example]]
+name = "polars_integration"
+path = "examples/polars_integration.rs"

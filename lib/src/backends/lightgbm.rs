@@ -94,84 +94,41 @@ impl Model for LightGBMModel {
         ModelBackend::LightGBM
     }
 
-    fn predict(&self, input: &ModelInput) -> Result<ModelOutput> {
-        match input {
-            ModelInput::Dense {
-                data,
-                num_rows,
-                num_features,
-            } => {
-                // Validate feature count
-                if *num_features != self.num_features_cache {
-                    return Err(InferError::InvalidShape {
-                        expected: format!("{}", self.num_features_cache),
-                        actual: format!("{}", num_features),
-                    });
-                }
+        fn predict(&self, input: &ModelInput) -> Result<ModelOutput> {
+        // Apply DataFrame transformations
+        let mut df = input.0.clone();
+        for transformer in &self.transformers {
+            df = transformer.transform(df)?;
+        }
 
-                // Lock the booster for prediction
-                let booster = self.booster.lock().map_err(|e| {
-                    InferError::Other(format!("Failed to acquire lock on LightGBM booster: {}", e))
-                })?;
+        // Use native Polars API for zero-copy Arrow-based prediction
+        let num_rows = df.height();
 
-                // Convert f32 to f64 for LightGBM
-                let data_f64: Vec<f64> = data.iter().map(|&x| x as f64).collect();
+        // Validate feature count
+        if df.width() != self.num_features_cache {
+            return Err(InferError::InvalidShape {
+                expected: format!("{}", self.num_features_cache),
+                actual: format!("{}", df.width()),
+            });
+        }
 
-                // Run prediction on dense data
-                // predict_type: 0 = normal prediction
-                let predictions = booster.predict(&data_f64, *num_rows as i32, *num_features as i32, 0)?;
+        // Lock the booster for prediction
+        let booster = self.booster.lock().map_err(|e| {
+            InferError::Other(format!("Failed to acquire lock on LightGBM booster: {}", e))
+        })?;
 
-                // LightGBM returns one value per row for binary/regression
-                // For multiclass, it returns num_rows * num_classes values
-                if predictions.len() == *num_rows {
-                    Ok(ModelOutput::Single(predictions))
-                } else {
-                    let num_classes = predictions.len() / num_rows;
-                    Ok(ModelOutput::Multi {
-                        data: predictions,
-                        num_classes,
-                    })
-                }
-            }
-            ModelInput::DataFrame(df) => {
-                // Apply DataFrame transformations
-                let mut transformed_df = df.clone();
-                for transformer in &self.transformers {
-                    transformed_df = transformer.transform(transformed_df)?;
-                }
+        // Use the native Polars extension trait for optimized prediction
+        let predictions = booster.predict_dataframe(&df, 0)?;
 
-                // Use native Polars API for zero-copy Arrow-based prediction
-                let num_rows = transformed_df.height();
-
-                // Validate feature count
-                if transformed_df.width() != self.num_features_cache {
-                    return Err(InferError::InvalidShape {
-                        expected: format!("{}", self.num_features_cache),
-                        actual: format!("{}", transformed_df.width()),
-                    });
-                }
-
-                // Lock the booster for prediction
-                let booster = self.booster.lock().map_err(|e| {
-                    InferError::Other(format!("Failed to acquire lock on LightGBM booster: {}", e))
-                })?;
-
-                // Use the native Polars extension trait for optimized prediction
-                // predict_type: 0 = normal prediction
-                let predictions = booster.predict_dataframe(&transformed_df, 0)?;
-
-                // LightGBM returns one value per row for binary/regression
-                // For multiclass, it returns num_rows * num_classes values
-                if predictions.len() == num_rows {
-                    Ok(ModelOutput::Single(predictions))
-                } else {
-                    let num_classes = predictions.len() / num_rows;
-                    Ok(ModelOutput::Multi {
-                        data: predictions,
-                        num_classes,
-                    })
-                }
-            }
+        // LightGBM returns one value per row for binary/regression
+        if predictions.len() == num_rows {
+            Ok(ModelOutput::Single(predictions))
+        } else {
+            let num_classes = predictions.len() / num_rows;
+            Ok(ModelOutput::Multi {
+                data: predictions,
+                num_classes,
+            })
         }
     }
 
