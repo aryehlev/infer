@@ -1,6 +1,9 @@
 use crate::error::{InferError, Result};
-use crate::model::{Model, ModelBackend, ModelInput, ModelMetadata, ModelOutput, DynPreprocessingPipeline, DynDataFrameTransformer};
-use perpetual::{PerpetualBooster, Matrix};
+use crate::model::{
+    DynDataFrameTransformer, DynPreprocessingPipeline, Model, ModelBackend, ModelInput,
+    ModelMetadata, ModelOutput,
+};
+use perpetual::{Matrix, PerpetualBooster};
 use polars::prelude::*;
 use std::path::Path;
 
@@ -16,9 +19,10 @@ pub struct PerpetualModel {
 impl PerpetualModel {
     /// Load a Perpetual model from a file
     pub fn load<P: AsRef<Path>>(id: String, path: P) -> Result<Self> {
-        let path_str = path.as_ref().to_str().ok_or_else(|| {
-            InferError::Other("Invalid path".to_string())
-        })?;
+        let path_str = path
+            .as_ref()
+            .to_str()
+            .ok_or_else(|| InferError::Other("Invalid path".to_string()))?;
         let booster = PerpetualBooster::load_booster(path_str)?;
         Ok(Self {
             id,
@@ -75,7 +79,7 @@ impl Model for PerpetualModel {
         ModelBackend::Perpetual
     }
 
-        fn predict(&self, input: &ModelInput) -> Result<ModelOutput> {
+    fn predict(&self, input: &ModelInput) -> Result<ModelOutput> {
         // Apply DataFrame transformations
         let mut df = input.0.clone();
         for transformer in &self.transformers {
@@ -112,7 +116,7 @@ impl Model for PerpetualModel {
         // so we'll need to infer it from the model structure
         // For now, return an error indicating this needs to be set via metadata
         Err(InferError::Other(
-            "Perpetual models require feature count to be specified in metadata".to_string()
+            "Perpetual models require feature count to be specified in metadata".to_string(),
         ))
     }
 
@@ -151,9 +155,9 @@ fn extract_f64_value(series: &Series, idx: usize) -> Result<f64> {
             })?)
         }
         Int8 => {
-            let ca = series.i8().map_err(|e| {
-                InferError::ConversionError(format!("Failed to cast to i8: {}", e))
-            })?;
+            let ca = series
+                .i8()
+                .map_err(|e| InferError::ConversionError(format!("Failed to cast to i8: {}", e)))?;
             Ok(ca.get(idx).ok_or_else(|| {
                 InferError::ConversionError(format!("Null value at index {}", idx))
             })? as f64)
@@ -183,9 +187,9 @@ fn extract_f64_value(series: &Series, idx: usize) -> Result<f64> {
             })? as f64)
         }
         UInt8 => {
-            let ca = series.u8().map_err(|e| {
-                InferError::ConversionError(format!("Failed to cast to u8: {}", e))
-            })?;
+            let ca = series
+                .u8()
+                .map_err(|e| InferError::ConversionError(format!("Failed to cast to u8: {}", e)))?;
             Ok(ca.get(idx).ok_or_else(|| {
                 InferError::ConversionError(format!("Null value at index {}", idx))
             })? as f64)
@@ -218,13 +222,15 @@ fn extract_f64_value(series: &Series, idx: usize) -> Result<f64> {
             let ca = series.bool().map_err(|e| {
                 InferError::ConversionError(format!("Failed to cast to bool: {}", e))
             })?;
-            Ok(if ca.get(idx).ok_or_else(|| {
-                InferError::ConversionError(format!("Null value at index {}", idx))
-            })? {
-                1.0
-            } else {
-                0.0
-            })
+            Ok(
+                if ca.get(idx).ok_or_else(|| {
+                    InferError::ConversionError(format!("Null value at index {}", idx))
+                })? {
+                    1.0
+                } else {
+                    0.0
+                },
+            )
         }
         dt => Err(InferError::ConversionError(format!(
             "Unsupported data type for conversion to f64: {}",

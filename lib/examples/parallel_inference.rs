@@ -1,5 +1,4 @@
 /// Example showing parallel inference on multiple models
-
 use infer_lib::prelude::*;
 use std::time::Instant;
 

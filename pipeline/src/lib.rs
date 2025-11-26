@@ -38,25 +38,24 @@ pub mod pipeline;
 
 // Re-export core types from lib
 pub use infer_lib::{
-    Result, InferError,
-    ModelOutput, ModelInput,
-    ModelRegistry, Model, ModelBackend,
-    DataFrameTransformer,
+    DataFrameTransformer, InferError, Model, ModelBackend, ModelInput, ModelOutput, ModelRegistry,
+    Result,
 };
 
 pub use pipeline::{
-    context::{ExecutionContext, ContextData},
-    step::{PipelineStep, DynPipelineStep, StepResult, ConditionalStep, SequenceStep, ParallelStep},
+    context::{ContextData, ExecutionContext},
     pipeline::{Pipeline, PipelineBuilder},
+    step::{
+        ConditionalStep, DynPipelineStep, ParallelStep, PipelineStep, SequenceStep, StepResult,
+    },
     steps,
 };
 
 /// Prelude module for convenient imports
 pub mod prelude {
     pub use crate::pipeline::{
-        ExecutionContext, ContextData,
-        PipelineStep, DynPipelineStep, StepResult,
-        Pipeline, PipelineBuilder,
+        ContextData, DynPipelineStep, ExecutionContext, Pipeline, PipelineBuilder, PipelineStep,
+        StepResult,
     };
     pub use crate::steps;
 

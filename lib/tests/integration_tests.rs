@@ -84,8 +84,8 @@ fn test_end_to_end_dataframe_workflow() {
     .unwrap();
 
     // 2. Create model with transformer
-    let model = MockPredictorModel::new("test_model")
-        .with_transformer(Arc::new(NormalizeTransformer));
+    let model =
+        MockPredictorModel::new("test_model").with_transformer(Arc::new(NormalizeTransformer));
 
     // 3. Run prediction
     let output = model.predict(&ModelInput(df)).unwrap();
@@ -110,8 +110,7 @@ fn test_registry_with_transformers() {
     let registry = ModelRegistry::new();
 
     // Register model with transformer
-    let model = MockPredictorModel::new("model1")
-        .with_transformer(Arc::new(NormalizeTransformer));
+    let model = MockPredictorModel::new("model1").with_transformer(Arc::new(NormalizeTransformer));
     registry.register("model1".to_string(), model);
 
     // Create test data
@@ -166,11 +165,7 @@ fn test_multiple_models_parallel() {
     // Run parallel predictions
     let results = registry.predict_many(
         &["model1", "model2", "model3"],
-        &[
-            ModelInput(df1),
-            ModelInput(df2),
-            ModelInput(df3),
-        ],
+        &[ModelInput(df1), ModelInput(df2), ModelInput(df3)],
     );
 
     assert_eq!(results.len(), 3);
@@ -187,8 +182,7 @@ fn test_broadcast_same_data_multiple_models() {
 
     // Register models with different transformers
     let model1 = MockPredictorModel::new("model1");
-    let model2 = MockPredictorModel::new("model2")
-        .with_transformer(Arc::new(NormalizeTransformer));
+    let model2 = MockPredictorModel::new("model2").with_transformer(Arc::new(NormalizeTransformer));
 
     registry.register("model1".to_string(), model1);
     registry.register("model2".to_string(), model2);
@@ -289,8 +283,7 @@ fn test_model_hot_swap() {
     let output1 = registry.predict("prod_model", &ModelInput(df1)).unwrap();
 
     // Hot-swap model (with transformer this time)
-    let new_model = MockPredictorModel::new("v2")
-        .with_transformer(Arc::new(NormalizeTransformer));
+    let new_model = MockPredictorModel::new("v2").with_transformer(Arc::new(NormalizeTransformer));
     registry.register("prod_model".to_string(), new_model);
 
     // Create DataFrame input for second prediction
@@ -307,7 +300,7 @@ fn test_model_hot_swap() {
     match (output1, output2) {
         (ModelOutput::Single(pred1), ModelOutput::Single(pred2)) => {
             assert_eq!(pred1[0], 10.0); // 5 + 5
-            assert_eq!(pred2[0], 1.0);  // (5 + 5) / 10
+            assert_eq!(pred2[0], 1.0); // (5 + 5) / 10
         }
         _ => panic!("Expected Single outputs"),
     }

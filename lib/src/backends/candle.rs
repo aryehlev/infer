@@ -87,17 +87,17 @@ impl Model for CandleModel {
         ModelBackend::Candle
     }
 
-        fn predict(&self, input: &ModelInput) -> Result<ModelOutput> {
+    fn predict(&self, input: &ModelInput) -> Result<ModelOutput> {
         // Convert DataFrame to dense f32
         use crate::polars_ext::dataframe_to_dense_f32;
         let (data, num_rows, num_features) = dataframe_to_dense_f32(&input.0)?;
 
         // Create Candle tensor
-        let tensor = Tensor::from_vec(data, (num_rows, num_features), &self.device)
+        let _tensor = Tensor::from_vec(data, (num_rows, num_features), &self.device)
             .map_err(|e| crate::InferError::Other(format!("Candle error: {}", e)))?;
 
         // In a real implementation, run the model forward pass:
-        // let output = self.model.forward(&tensor)?;
+        // let output = self.model.forward(&_tensor)?;
 
         // For now, return a simple output (this is a placeholder)
         let predictions = vec![0.5; num_rows];
@@ -124,14 +124,25 @@ mod tests {
 
     #[test]
     fn test_candle_prediction_placeholder() {
+        use polars::prelude::*;
         let model = CandleModel::new("test").unwrap();
 
-        let input = ModelInput::DenseF32 {
-            data: vec![1.0; 10],
-            num_rows: 1,
-            num_features: 10,
-        };
+        // Create a simple DataFrame with 1 row and 10 features
+        let df = df! {
+            "f0" => [1.0f32],
+            "f1" => [2.0f32],
+            "f2" => [3.0f32],
+            "f3" => [4.0f32],
+            "f4" => [5.0f32],
+            "f5" => [6.0f32],
+            "f6" => [7.0f32],
+            "f7" => [8.0f32],
+            "f8" => [9.0f32],
+            "f9" => [10.0f32],
+        }
+        .unwrap();
 
+        let input = ModelInput(df);
         let output = model.predict(&input).unwrap();
         match output {
             ModelOutput::Single(preds) => {

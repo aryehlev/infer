@@ -1,7 +1,7 @@
 use crate::error::Result;
 use polars::prelude::*;
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Trait for transforming Polars DataFrames before inference
 ///
@@ -54,10 +54,7 @@ pub enum ModelOutput {
 
     /// Multi-output numeric predictions (multiclass probabilities)
     /// Shape: (num_rows, num_classes)
-    Multi {
-        data: Vec<f64>,
-        num_classes: usize
-    },
+    Multi { data: Vec<f64>, num_classes: usize },
 
     /// Text output (LLM generation, translation)
     Text(Vec<String>),
@@ -133,7 +130,10 @@ impl ModelOutput {
             ModelOutput::Multi { data, num_classes } => data.len() / num_classes,
             ModelOutput::Text(texts) => texts.len(),
             ModelOutput::TextSingle(_) => 1,
-            ModelOutput::Embeddings { data, embedding_dim } => data.len() / embedding_dim,
+            ModelOutput::Embeddings {
+                data,
+                embedding_dim,
+            } => data.len() / embedding_dim,
             ModelOutput::Tokens(tokens) => tokens.len(),
             ModelOutput::Classifications { labels, .. } => labels.len(),
             ModelOutput::Custom(_) => 0,

@@ -1,5 +1,4 @@
 /// Example showing how to use the execution engine for ML pipelines
-
 use infer_lib::prelude::*;
 use infer_lib::steps::*;
 use polars::prelude::*;
@@ -30,9 +29,11 @@ impl Model for DemoModel {
                     _ => unreachable!(),
                 }
             }
-            _ => return Err(InferError::Other(
-                "Example model only supports DenseF32 and DataFrame inputs".to_string()
-            )),
+            _ => {
+                return Err(InferError::Other(
+                    "Example model only supports DenseF32 and DataFrame inputs".to_string(),
+                ))
+            }
         };
 
         // Simple prediction: sum of features * multiplier
@@ -217,12 +218,21 @@ fn parallel_inference_example(registry: Arc<ModelRegistry>) -> Result<()> {
         )))
         .add_fn("display_results", |ctx| {
             println!("  Step 4: Displaying results...");
-            println!("  Model v1 predictions: {:?}",
-                ctx.get("pred_model_v1").unwrap().as_model_output().unwrap());
-            println!("  Model v2 predictions: {:?}",
-                ctx.get("pred_model_v2").unwrap().as_model_output().unwrap());
-            println!("  Ensemble predictions: {:?}",
-                ctx.get("final_predictions").unwrap().as_model_output().unwrap());
+            println!(
+                "  Model v1 predictions: {:?}",
+                ctx.get("pred_model_v1").unwrap().as_model_output().unwrap()
+            );
+            println!(
+                "  Model v2 predictions: {:?}",
+                ctx.get("pred_model_v2").unwrap().as_model_output().unwrap()
+            );
+            println!(
+                "  Ensemble predictions: {:?}",
+                ctx.get("final_predictions")
+                    .unwrap()
+                    .as_model_output()
+                    .unwrap()
+            );
             Ok(StepResult::Continue)
         })
         .build();
@@ -238,7 +248,8 @@ fn complete_workflow_example(registry: Arc<ModelRegistry>) -> Result<()> {
     struct ScaleTransformer;
     impl DataFrameTransformer for ScaleTransformer {
         fn transform(&self, df: DataFrame) -> Result<DataFrame> {
-            let result = df.lazy()
+            let result = df
+                .lazy()
                 .with_columns(vec![col("*").cast(DataType::Float64) / lit(10.0)])
                 .collect()?;
             Ok(result)

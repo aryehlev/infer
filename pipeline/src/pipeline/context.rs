@@ -1,8 +1,8 @@
+use crate::{ModelInput, ModelOutput};
+use polars::prelude::*;
 /// Execution context for passing data between pipeline steps
 use std::collections::HashMap;
 use std::sync::Arc;
-use polars::prelude::*;
-use crate::{ModelOutput, ModelInput};
 
 /// Data that can be stored in the execution context
 #[derive(Clone, Debug)]

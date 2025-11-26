@@ -17,8 +17,9 @@ fn test_model_not_found_error() {
 
 #[test]
 fn test_empty_dataframe_error() {
+    use infer_lib::polars_ext::dataframe_to_dense_f32;
     let df = DataFrame::empty();
-    let result = df.to_model_input();
+    let result = dataframe_to_dense_f32(&df);
 
     assert!(result.is_err());
     match result {
@@ -37,19 +38,21 @@ fn test_invalid_column_selection() {
     }
     .unwrap();
 
-    let result = df.to_model_input_with_columns(&["a", "nonexistent"]);
+    // Test selecting non-existent column
+    let result = df.select(vec!["a", "nonexistent"]);
     assert!(result.is_err());
 }
 
 #[test]
 fn test_unsupported_dtype_error() {
+    use infer_lib::polars_ext::dataframe_to_dense_f32;
     // Create DataFrame with string type (unsupported)
     let df = df! {
         "strings" => ["a", "b", "c"],
     }
     .unwrap();
 
-    let result = df.to_model_input();
+    let result = dataframe_to_dense_f32(&df);
     assert!(result.is_err());
     match result {
         Err(InferError::ConversionError(msg)) => {
@@ -86,7 +89,9 @@ fn test_error_from_polars() {
     .unwrap();
 
     // Try to select non-existent column
-    let result: Result<DataFrame> = df.select(vec!["nonexistent".to_string()]).map_err(Into::into);
+    let result: Result<DataFrame> = df
+        .select(vec!["nonexistent".to_string()])
+        .map_err(Into::into);
     assert!(result.is_err());
     match result {
         Err(InferError::PolarsError(_)) => {}
@@ -127,12 +132,13 @@ fn test_backend_enum_equality() {
 
 #[test]
 fn test_dataframe_with_nulls() {
+    use infer_lib::polars_ext::dataframe_to_dense_f32;
     let df = df! {
         "a" => [Some(1.0f32), None, Some(3.0)],
     }
     .unwrap();
 
-    let result = df.to_model_input();
+    let result = dataframe_to_dense_f32(&df);
     // Should fail on null value
     assert!(result.is_err());
     match result {

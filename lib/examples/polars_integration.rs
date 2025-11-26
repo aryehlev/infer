@@ -1,7 +1,6 @@
-/// Example showing Polars DataFrame integration
-
-use infer_lib::prelude::*;
 use infer_lib::output_to_series;
+/// Example showing Polars DataFrame integration
+use infer_lib::prelude::*;
 use polars::prelude::*;
 
 fn main() -> Result<()> {
@@ -19,7 +18,11 @@ fn main() -> Result<()> {
         let input = ModelInput(df.clone());
 
         println!("✓ Created ModelInput from DataFrame");
-        println!("  Shape: {} rows × {} features", input.0.height(), input.0.width());
+        println!(
+            "  Shape: {} rows × {} features",
+            input.0.height(),
+            input.0.width()
+        );
     }
 
     println!();

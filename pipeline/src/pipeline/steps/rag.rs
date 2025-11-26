@@ -1,7 +1,7 @@
+use crate::pipeline::{ContextData, ExecutionContext, PipelineStep, StepResult};
+use crate::Result;
 /// RAG (Retrieval-Augmented Generation) pipeline steps
 use std::sync::Arc;
-use crate::Result;
-use crate::pipeline::{PipelineStep, StepResult, ExecutionContext, ContextData};
 
 /// Step that retrieves documents based on a query
 pub struct RetrievalStep {
@@ -53,23 +53,25 @@ impl RetrievalStep {
 impl PipelineStep for RetrievalStep {
     fn execute(&self, ctx: &mut ExecutionContext) -> Result<StepResult> {
         // Get query from context
-        let query_data = ctx.get(&self.query_key)
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Query key '{}' not found in context", self.query_key)
-            ))?;
+        let query_data = ctx.get(&self.query_key).ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Query key '{}' not found in context",
+                self.query_key
+            ))
+        })?;
 
-        let query = query_data.as_string()
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Query key '{}' is not a string", self.query_key)
-            ))?;
+        let query = query_data.as_string().ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Query key '{}' is not a string",
+                self.query_key
+            ))
+        })?;
 
         // Retrieve documents
         let documents = self.retriever.retrieve(query, self.top_k)?;
 
         // Store documents as a vector of strings (content only)
-        let contents: Vec<String> = documents.iter()
-            .map(|doc| doc.content.clone())
-            .collect();
+        let contents: Vec<String> = documents.iter().map(|doc| doc.content.clone()).collect();
 
         ctx.insert(&self.output_key, ContextData::StringVec(contents));
 
@@ -134,33 +136,40 @@ impl RankingStep {
 impl PipelineStep for RankingStep {
     fn execute(&self, ctx: &mut ExecutionContext) -> Result<StepResult> {
         // Get query from context
-        let query_data = ctx.get(&self.query_key)
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Query key '{}' not found in context", self.query_key)
-            ))?;
+        let query_data = ctx.get(&self.query_key).ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Query key '{}' not found in context",
+                self.query_key
+            ))
+        })?;
 
-        let query = query_data.as_string()
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Query key '{}' is not a string", self.query_key)
-            ))?;
+        let query = query_data.as_string().ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Query key '{}' is not a string",
+                self.query_key
+            ))
+        })?;
 
         // Get documents from context
         let docs_key = format!("{}_full", self.documents_key);
-        let docs_data = ctx.get(&docs_key)
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Documents key '{}' not found in context", docs_key)
-            ))?;
+        let docs_data = ctx.get(&docs_key).ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Documents key '{}' not found in context",
+                docs_key
+            ))
+        })?;
 
         let documents = match docs_data {
-            ContextData::Custom(data) => {
-                data.downcast_ref::<Vec<Document>>()
-                    .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                        "Documents data is not the correct type".to_string()
-                    ))?
+            ContextData::Custom(data) => data.downcast_ref::<Vec<Document>>().ok_or_else(|| {
+                infer_lib::InferError::InvalidInput(
+                    "Documents data is not the correct type".to_string(),
+                )
+            })?,
+            _ => {
+                return Err(infer_lib::InferError::InvalidInput(
+                    "Documents data is not Custom type".to_string(),
+                ))
             }
-            _ => return Err(infer_lib::InferError::InvalidInput(
-                "Documents data is not Custom type".to_string()
-            )),
         };
 
         // Rank documents
@@ -172,9 +181,7 @@ impl PipelineStep for RankingStep {
         }
 
         // Store ranked documents
-        let contents: Vec<String> = ranked.iter()
-            .map(|doc| doc.content.clone())
-            .collect();
+        let contents: Vec<String> = ranked.iter().map(|doc| doc.content.clone()).collect();
 
         ctx.insert(&self.output_key, ContextData::StringVec(contents));
 
@@ -227,32 +234,41 @@ impl PromptConstructionStep {
 impl PipelineStep for PromptConstructionStep {
     fn execute(&self, ctx: &mut ExecutionContext) -> Result<StepResult> {
         // Get query from context
-        let query_data = ctx.get(&self.query_key)
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Query key '{}' not found in context", self.query_key)
-            ))?;
+        let query_data = ctx.get(&self.query_key).ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Query key '{}' not found in context",
+                self.query_key
+            ))
+        })?;
 
-        let query = query_data.as_string()
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Query key '{}' is not a string", self.query_key)
-            ))?;
+        let query = query_data.as_string().ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Query key '{}' is not a string",
+                self.query_key
+            ))
+        })?;
 
         // Get documents from context
-        let docs_data = ctx.get(&self.documents_key)
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Documents key '{}' not found in context", self.documents_key)
-            ))?;
+        let docs_data = ctx.get(&self.documents_key).ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Documents key '{}' not found in context",
+                self.documents_key
+            ))
+        })?;
 
-        let documents = docs_data.as_string_vec()
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Documents key '{}' is not a string vector", self.documents_key)
-            ))?;
+        let documents = docs_data.as_string_vec().ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Documents key '{}' is not a string vector",
+                self.documents_key
+            ))
+        })?;
 
         // Construct documents string
         let docs_str = documents.join("\n\n");
 
         // Replace placeholders in template
-        let prompt = self.template
+        let prompt = self
+            .template
             .replace("{query}", query)
             .replace("{documents}", &docs_str);
 
@@ -300,33 +316,35 @@ impl PipelineStep for ScoreFilterStep {
     fn execute(&self, ctx: &mut ExecutionContext) -> Result<StepResult> {
         // Get documents from context
         let docs_key = format!("{}_full", self.documents_key);
-        let docs_data = ctx.get(&docs_key)
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Documents key '{}' not found in context", docs_key)
-            ))?;
+        let docs_data = ctx.get(&docs_key).ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Documents key '{}' not found in context",
+                docs_key
+            ))
+        })?;
 
         let documents = match docs_data {
-            ContextData::Custom(data) => {
-                data.downcast_ref::<Vec<Document>>()
-                    .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                        "Documents data is not the correct type".to_string()
-                    ))?
+            ContextData::Custom(data) => data.downcast_ref::<Vec<Document>>().ok_or_else(|| {
+                infer_lib::InferError::InvalidInput(
+                    "Documents data is not the correct type".to_string(),
+                )
+            })?,
+            _ => {
+                return Err(infer_lib::InferError::InvalidInput(
+                    "Documents data is not Custom type".to_string(),
+                ))
             }
-            _ => return Err(infer_lib::InferError::InvalidInput(
-                "Documents data is not Custom type".to_string()
-            )),
         };
 
         // Filter by threshold
-        let filtered: Vec<Document> = documents.iter()
+        let filtered: Vec<Document> = documents
+            .iter()
             .filter(|doc| doc.score >= self.threshold)
             .cloned()
             .collect();
 
         // Store filtered documents
-        let contents: Vec<String> = filtered.iter()
-            .map(|doc| doc.content.clone())
-            .collect();
+        let contents: Vec<String> = filtered.iter().map(|doc| doc.content.clone()).collect();
 
         ctx.insert(&self.output_key, ContextData::StringVec(contents));
 
@@ -368,13 +386,7 @@ mod tests {
 
     #[test]
     fn test_retrieval_step() {
-        let step = RetrievalStep::new(
-            "retrieve",
-            Arc::new(MockRetriever),
-            "query",
-            "documents",
-            3,
-        );
+        let step = RetrievalStep::new("retrieve", Arc::new(MockRetriever), "query", "documents", 3);
 
         let mut ctx = ExecutionContext::new();
         ctx.insert("query", ContextData::String("test query".to_string()));
@@ -398,10 +410,13 @@ mod tests {
 
         let mut ctx = ExecutionContext::new();
         ctx.insert("query", ContextData::String("What is Rust?".to_string()));
-        ctx.insert("documents", ContextData::StringVec(vec![
-            "Rust is a systems programming language.".to_string(),
-            "It focuses on safety and performance.".to_string(),
-        ]));
+        ctx.insert(
+            "documents",
+            ContextData::StringVec(vec![
+                "Rust is a systems programming language.".to_string(),
+                "It focuses on safety and performance.".to_string(),
+            ]),
+        );
 
         step.execute(&mut ctx).unwrap();
 

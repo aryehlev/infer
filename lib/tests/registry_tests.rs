@@ -41,7 +41,10 @@ fn test_registry_basic_operations() {
     let registry = ModelRegistry::new();
 
     // Register a model
-    registry.register("model1".to_string(), MockModel::new("model1", vec![1.0, 2.0]));
+    registry.register(
+        "model1".to_string(),
+        MockModel::new("model1", vec![1.0, 2.0]),
+    );
     assert!(registry.contains("model1"));
     assert_eq!(registry.len(), 1);
 
@@ -240,10 +243,7 @@ fn test_registry_concurrent_updates() {
         let registry_clone = Arc::clone(&registry);
         let handle = thread::spawn(move || {
             let model_id = format!("model{}", i);
-            registry_clone.register(
-                model_id.clone(),
-                MockModel::new(&model_id, vec![i as f64]),
-            );
+            registry_clone.register(model_id.clone(), MockModel::new(&model_id, vec![i as f64]));
         });
         handles.push(handle);
     }

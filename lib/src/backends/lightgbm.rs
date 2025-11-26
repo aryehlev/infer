@@ -1,5 +1,8 @@
 use crate::error::{InferError, Result};
-use crate::model::{Model, ModelBackend, ModelInput, ModelMetadata, ModelOutput, DynPreprocessingPipeline, DynDataFrameTransformer};
+use crate::model::{
+    DynDataFrameTransformer, DynPreprocessingPipeline, Model, ModelBackend, ModelInput,
+    ModelMetadata, ModelOutput,
+};
 use lightgbm_rust::{Booster, BoosterPolarsExt};
 use std::path::Path;
 use std::sync::Mutex;
@@ -94,7 +97,7 @@ impl Model for LightGBMModel {
         ModelBackend::LightGBM
     }
 
-        fn predict(&self, input: &ModelInput) -> Result<ModelOutput> {
+    fn predict(&self, input: &ModelInput) -> Result<ModelOutput> {
         // Apply DataFrame transformations
         let mut df = input.0.clone();
         for transformer in &self.transformers {

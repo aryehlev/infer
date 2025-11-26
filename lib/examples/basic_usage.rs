@@ -1,5 +1,4 @@
 /// Basic usage example showing how to load models and run inference
-
 use infer_lib::prelude::*;
 
 fn main() -> Result<()> {

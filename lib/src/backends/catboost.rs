@@ -1,5 +1,8 @@
 use crate::error::{InferError, Result};
-use crate::model::{Model, ModelBackend, ModelInput, ModelMetadata, ModelOutput, DynPreprocessingPipeline, DynDataFrameTransformer};
+use crate::model::{
+    DynDataFrameTransformer, DynPreprocessingPipeline, Model, ModelBackend, ModelInput,
+    ModelMetadata, ModelOutput,
+};
 use catboost_rust::{Model as CatBoostNativeModel, ModelPolarsExt};
 use std::path::Path;
 
@@ -81,7 +84,7 @@ impl Model for CatBoostModel {
         ModelBackend::CatBoost
     }
 
-        fn predict(&self, input: &ModelInput) -> Result<ModelOutput> {
+    fn predict(&self, input: &ModelInput) -> Result<ModelOutput> {
         // Apply DataFrame transformations
         let mut df = input.0.clone();
         for transformer in &self.transformers {

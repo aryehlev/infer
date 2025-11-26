@@ -1,7 +1,7 @@
+use super::context::ExecutionContext;
+use crate::Result;
 /// Pipeline step trait and related types
 use std::sync::Arc;
-use crate::Result;
-use super::context::ExecutionContext;
 
 /// Result of executing a pipeline step
 #[derive(Debug, Clone)]
@@ -138,11 +138,13 @@ impl PipelineStep for ParallelStep {
         use rayon::prelude::*;
 
         // Clone context for each parallel branch
-        let results: Vec<_> = self.steps
+        let results: Vec<_> = self
+            .steps
             .par_iter()
             .map(|step| {
                 let mut ctx_clone = ctx.clone();
-                step.execute(&mut ctx_clone).map(|result| (result, ctx_clone))
+                step.execute(&mut ctx_clone)
+                    .map(|result| (result, ctx_clone))
             })
             .collect();
 

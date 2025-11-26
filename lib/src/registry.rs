@@ -178,7 +178,12 @@ mod tests {
         let registry = ModelRegistry::new();
 
         // Register a model
-        registry.register("model1".to_string(), MockModel { id: "model1".to_string() });
+        registry.register(
+            "model1".to_string(),
+            MockModel {
+                id: "model1".to_string(),
+            },
+        );
         assert!(registry.contains("model1"));
         assert_eq!(registry.len(), 1);
 

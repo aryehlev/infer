@@ -1,7 +1,7 @@
+use crate::pipeline::{ContextData, ExecutionContext, PipelineStep, StepResult};
+use crate::{ModelInput, ModelRegistry, Result};
 /// Model inference pipeline steps
 use std::sync::Arc;
-use crate::{ModelRegistry, ModelInput, Result};
-use crate::pipeline::{PipelineStep, StepResult, ExecutionContext, ContextData};
 
 /// Step that runs model inference
 pub struct InferenceStep {
@@ -34,18 +34,23 @@ impl InferenceStep {
 impl PipelineStep for InferenceStep {
     fn execute(&self, ctx: &mut ExecutionContext) -> Result<StepResult> {
         // Get input from context
-        let input = ctx.get(&self.input_key)
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Input key '{}' not found in context", self.input_key)
-            ))?;
+        let input = ctx.get(&self.input_key).ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Input key '{}' not found in context",
+                self.input_key
+            ))
+        })?;
 
         // Convert to ModelInput if it's a DataFrame
         let model_input = match input {
             ContextData::ModelInput(input) => input.clone(),
-            ContextData::DataFrame(df) => ModelInput::DataFrame(df.clone()),
-            _ => return Err(infer_lib::InferError::InvalidInput(
-                format!("Input key '{}' is not a valid model input", self.input_key)
-            )),
+            ContextData::DataFrame(df) => ModelInput(df.clone()),
+            _ => {
+                return Err(infer_lib::InferError::InvalidInput(format!(
+                    "Input key '{}' is not a valid model input",
+                    self.input_key
+                )))
+            }
         };
 
         // Run inference
@@ -97,23 +102,30 @@ impl ParallelInferenceStep {
 impl PipelineStep for ParallelInferenceStep {
     fn execute(&self, ctx: &mut ExecutionContext) -> Result<StepResult> {
         // Get input from context
-        let input = ctx.get(&self.input_key)
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Input key '{}' not found in context", self.input_key)
-            ))?;
+        let input = ctx.get(&self.input_key).ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Input key '{}' not found in context",
+                self.input_key
+            ))
+        })?;
 
         // Convert to ModelInput if it's a DataFrame
         let model_input = match input {
             ContextData::ModelInput(input) => input.clone(),
-            ContextData::DataFrame(df) => ModelInput::DataFrame(df.clone()),
-            _ => return Err(infer_lib::InferError::InvalidInput(
-                format!("Input key '{}' is not a valid model input", self.input_key)
-            )),
+            ContextData::DataFrame(df) => ModelInput(df.clone()),
+            _ => {
+                return Err(infer_lib::InferError::InvalidInput(format!(
+                    "Input key '{}' is not a valid model input",
+                    self.input_key
+                )))
+            }
         };
 
         // Run inference on all models in parallel
         let model_id_refs: Vec<&str> = self.model_ids.iter().map(|s| s.as_str()).collect();
-        let results = self.registry.predict_broadcast(&model_id_refs, &model_input);
+        let results = self
+            .registry
+            .predict_broadcast(&model_id_refs, &model_input);
 
         // Store outputs in context
         for (model_id, result) in results {
@@ -180,26 +192,30 @@ impl PipelineStep for EnsembleStep {
         let mut all_predictions = Vec::new();
 
         for key in &self.input_keys {
-            let data = ctx.get(key)
-                .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                    format!("Input key '{}' not found in context", key)
-                ))?;
+            let data = ctx.get(key).ok_or_else(|| {
+                infer_lib::InferError::InvalidInput(format!(
+                    "Input key '{}' not found in context",
+                    key
+                ))
+            })?;
 
-            let output = data.as_model_output()
-                .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                    format!("Input key '{}' is not a ModelOutput", key)
-                ))?;
+            let output = data.as_model_output().ok_or_else(|| {
+                infer_lib::InferError::InvalidInput(format!(
+                    "Input key '{}' is not a ModelOutput",
+                    key
+                ))
+            })?;
 
             let predictions = match output {
                 ModelOutput::Single(preds) => preds.clone(),
                 ModelOutput::Multi { .. } => {
                     return Err(infer_lib::InferError::InvalidInput(
-                        "Ensemble does not support multi-output models yet".to_string()
+                        "Ensemble does not support multi-output models yet".to_string(),
                     ))
                 }
                 _ => {
                     return Err(infer_lib::InferError::InvalidInput(
-                        "Ensemble only supports Single and Multi numeric outputs".to_string()
+                        "Ensemble only supports Single and Multi numeric outputs".to_string(),
                     ))
                 }
             };
@@ -212,7 +228,7 @@ impl PipelineStep for EnsembleStep {
         for preds in &all_predictions {
             if preds.len() != num_rows {
                 return Err(infer_lib::InferError::InvalidInput(
-                    "All predictions must have the same number of rows".to_string()
+                    "All predictions must have the same number of rows".to_string(),
                 ));
             }
         }
@@ -265,7 +281,10 @@ impl PipelineStep for EnsembleStep {
         };
 
         // Store result
-        ctx.insert(&self.output_key, ContextData::ModelOutput(ModelOutput::Single(ensembled)));
+        ctx.insert(
+            &self.output_key,
+            ContextData::ModelOutput(ModelOutput::Single(ensembled)),
+        );
 
         Ok(StepResult::Continue)
     }
@@ -282,8 +301,8 @@ impl PipelineStep for EnsembleStep {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ModelRegistry, ModelInput, ModelOutput, Model, ModelBackend};
     use crate::pipeline::ExecutionContext;
+    use crate::{Model, ModelBackend, ModelInput, ModelOutput, ModelRegistry};
 
     struct MockModel {
         id: String,
@@ -311,10 +330,13 @@ mod tests {
     #[test]
     fn test_inference_step() {
         let registry = Arc::new(ModelRegistry::new());
-        registry.register("model1".to_string(), MockModel {
-            id: "model1".to_string(),
-            prediction: vec![1.0, 2.0],
-        });
+        registry.register(
+            "model1".to_string(),
+            MockModel {
+                id: "model1".to_string(),
+                prediction: vec![1.0, 2.0],
+            },
+        );
 
         let step = InferenceStep::new(
             "inference",
@@ -325,11 +347,14 @@ mod tests {
         );
 
         let mut ctx = ExecutionContext::new();
-        ctx.insert("input", ContextData::ModelInput(ModelInput::DenseF32 {
-            data: vec![1.0, 2.0],
-            num_rows: 1,
-            num_features: 2,
-        }));
+        ctx.insert(
+            "input",
+            ContextData::ModelInput(ModelInput::DenseF32 {
+                data: vec![1.0, 2.0],
+                num_rows: 1,
+                num_features: 2,
+            }),
+        );
 
         step.execute(&mut ctx).unwrap();
 
@@ -343,8 +368,14 @@ mod tests {
     #[test]
     fn test_ensemble_step() {
         let mut ctx = ExecutionContext::new();
-        ctx.insert("pred1", ContextData::ModelOutput(ModelOutput::Single(vec![1.0, 2.0])));
-        ctx.insert("pred2", ContextData::ModelOutput(ModelOutput::Single(vec![3.0, 4.0])));
+        ctx.insert(
+            "pred1",
+            ContextData::ModelOutput(ModelOutput::Single(vec![1.0, 2.0])),
+        );
+        ctx.insert(
+            "pred2",
+            ContextData::ModelOutput(ModelOutput::Single(vec![3.0, 4.0])),
+        );
 
         let step = EnsembleStep::new(
             "ensemble",
@@ -355,7 +386,11 @@ mod tests {
 
         step.execute(&mut ctx).unwrap();
 
-        let output = ctx.get("ensemble_output").unwrap().as_model_output().unwrap();
+        let output = ctx
+            .get("ensemble_output")
+            .unwrap()
+            .as_model_output()
+            .unwrap();
         match output {
             ModelOutput::Single(preds) => {
                 assert_eq!(preds.len(), 2);

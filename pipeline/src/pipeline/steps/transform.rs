@@ -1,8 +1,8 @@
+use crate::pipeline::{ContextData, ExecutionContext, PipelineStep, StepResult};
+use crate::{DataFrameTransformer, Result};
+use polars::prelude::*;
 /// Data transformation pipeline steps
 use std::sync::Arc;
-use polars::prelude::*;
-use crate::{DataFrameTransformer, Result};
-use crate::pipeline::{PipelineStep, StepResult, ExecutionContext, ContextData};
 
 /// Step that applies a DataFrame transformation
 pub struct TransformStep {
@@ -32,15 +32,19 @@ impl TransformStep {
 impl PipelineStep for TransformStep {
     fn execute(&self, ctx: &mut ExecutionContext) -> Result<StepResult> {
         // Get DataFrame from context
-        let data = ctx.get(&self.input_key)
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Input key '{}' not found in context", self.input_key)
-            ))?;
+        let data = ctx.get(&self.input_key).ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Input key '{}' not found in context",
+                self.input_key
+            ))
+        })?;
 
-        let df = data.as_dataframe()
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Input key '{}' is not a DataFrame", self.input_key)
-            ))?;
+        let df = data.as_dataframe().ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Input key '{}' is not a DataFrame",
+                self.input_key
+            ))
+        })?;
 
         // Apply transformation
         let transformed = self.transformer.transform(df.clone())?;
@@ -88,15 +92,21 @@ impl TransformChainStep {
 impl PipelineStep for TransformChainStep {
     fn execute(&self, ctx: &mut ExecutionContext) -> Result<StepResult> {
         // Get DataFrame from context
-        let data = ctx.get(&self.input_key)
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Input key '{}' not found in context", self.input_key)
-            ))?;
+        let data = ctx.get(&self.input_key).ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Input key '{}' not found in context",
+                self.input_key
+            ))
+        })?;
 
-        let mut df = data.as_dataframe()
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Input key '{}' is not a DataFrame", self.input_key)
-            ))?
+        let mut df = data
+            .as_dataframe()
+            .ok_or_else(|| {
+                infer_lib::InferError::InvalidInput(format!(
+                    "Input key '{}' is not a DataFrame",
+                    self.input_key
+                ))
+            })?
             .clone();
 
         // Apply transformations sequentially
@@ -150,15 +160,19 @@ impl FilterStep {
 impl PipelineStep for FilterStep {
     fn execute(&self, ctx: &mut ExecutionContext) -> Result<StepResult> {
         // Get DataFrame from context
-        let data = ctx.get(&self.input_key)
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Input key '{}' not found in context", self.input_key)
-            ))?;
+        let data = ctx.get(&self.input_key).ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Input key '{}' not found in context",
+                self.input_key
+            ))
+        })?;
 
-        let df = data.as_dataframe()
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Input key '{}' is not a DataFrame", self.input_key)
-            ))?;
+        let df = data.as_dataframe().ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Input key '{}' is not a DataFrame",
+                self.input_key
+            ))
+        })?;
 
         // Apply filter condition
         let mask = (self.condition)(df)?;
@@ -207,15 +221,19 @@ impl SelectColumnsStep {
 impl PipelineStep for SelectColumnsStep {
     fn execute(&self, ctx: &mut ExecutionContext) -> Result<StepResult> {
         // Get DataFrame from context
-        let data = ctx.get(&self.input_key)
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Input key '{}' not found in context", self.input_key)
-            ))?;
+        let data = ctx.get(&self.input_key).ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Input key '{}' not found in context",
+                self.input_key
+            ))
+        })?;
 
-        let df = data.as_dataframe()
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Input key '{}' is not a DataFrame", self.input_key)
-            ))?;
+        let df = data.as_dataframe().ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Input key '{}' is not a DataFrame",
+                self.input_key
+            ))
+        })?;
 
         // Select columns
         let selected = df.select(&self.columns)?;
@@ -268,41 +286,50 @@ impl PipelineStep for AddPredictionColumnStep {
         use crate::ModelOutput;
 
         // Get DataFrame
-        let df_data = ctx.get(&self.df_key)
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("DataFrame key '{}' not found in context", self.df_key)
-            ))?;
+        let df_data = ctx.get(&self.df_key).ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "DataFrame key '{}' not found in context",
+                self.df_key
+            ))
+        })?;
 
-        let mut df = df_data.as_dataframe()
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Key '{}' is not a DataFrame", self.df_key)
-            ))?
+        let mut df = df_data
+            .as_dataframe()
+            .ok_or_else(|| {
+                infer_lib::InferError::InvalidInput(format!(
+                    "Key '{}' is not a DataFrame",
+                    self.df_key
+                ))
+            })?
             .clone();
 
         // Get predictions
-        let pred_data = ctx.get(&self.prediction_key)
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Prediction key '{}' not found in context", self.prediction_key)
-            ))?;
+        let pred_data = ctx.get(&self.prediction_key).ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Prediction key '{}' not found in context",
+                self.prediction_key
+            ))
+        })?;
 
-        let predictions = pred_data.as_model_output()
-            .ok_or_else(|| infer_lib::InferError::InvalidInput(
-                format!("Key '{}' is not a ModelOutput", self.prediction_key)
-            ))?;
+        let predictions = pred_data.as_model_output().ok_or_else(|| {
+            infer_lib::InferError::InvalidInput(format!(
+                "Key '{}' is not a ModelOutput",
+                self.prediction_key
+            ))
+        })?;
 
         // Convert predictions to Series
         let series = match predictions {
-            ModelOutput::Single(preds) => {
-                Series::new(self.column_name.as_str().into(), preds)
-            }
+            ModelOutput::Single(preds) => Series::new(self.column_name.as_str().into(), preds),
             ModelOutput::Multi { .. } => {
                 return Err(infer_lib::InferError::InvalidInput(
-                    "Multi-output predictions not supported for adding to DataFrame".to_string()
+                    "Multi-output predictions not supported for adding to DataFrame".to_string(),
                 ))
             }
             _ => {
                 return Err(infer_lib::InferError::InvalidInput(
-                    "Only Single numeric predictions are supported for adding to DataFrame".to_string()
+                    "Only Single numeric predictions are supported for adding to DataFrame"
+                        .to_string(),
                 ))
             }
         };
@@ -336,7 +363,8 @@ mod tests {
     impl DataFrameTransformer for TestTransformer {
         fn transform(&self, df: DataFrame) -> Result<DataFrame> {
             // Add 1 to all values
-            let transformed = df.lazy()
+            let transformed = df
+                .lazy()
                 .with_columns(vec![col("*").cast(DataType::Float64) + lit(1.0)])
                 .collect()?;
             Ok(transformed)
@@ -358,12 +386,7 @@ mod tests {
         let mut ctx = ExecutionContext::new();
         ctx.insert("input", ContextData::DataFrame(df));
 
-        let step = TransformStep::new(
-            "transform",
-            Arc::new(TestTransformer),
-            "input",
-            "output",
-        );
+        let step = TransformStep::new("transform", Arc::new(TestTransformer), "input", "output");
 
         step.execute(&mut ctx).unwrap();
 
@@ -408,17 +431,13 @@ mod tests {
 
         let mut ctx = ExecutionContext::new();
         ctx.insert("data", ContextData::DataFrame(df));
-        ctx.insert("predictions", ContextData::ModelOutput(
-            ModelOutput::Single(vec![10.0, 20.0, 30.0])
-        ));
-
-        let step = AddPredictionColumnStep::new(
-            "add_pred",
-            "data",
+        ctx.insert(
             "predictions",
-            "output",
-            "pred",
+            ContextData::ModelOutput(ModelOutput::Single(vec![10.0, 20.0, 30.0])),
         );
+
+        let step =
+            AddPredictionColumnStep::new("add_pred", "data", "predictions", "output", "pred");
 
         step.execute(&mut ctx).unwrap();
 

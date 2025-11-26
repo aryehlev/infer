@@ -1,8 +1,8 @@
-/// Pipeline for composing and executing multiple steps
-use std::sync::Arc;
-use crate::Result;
 use super::context::ExecutionContext;
 use super::step::{DynPipelineStep, PipelineStep, StepResult};
+use crate::Result;
+/// Pipeline for composing and executing multiple steps
+use std::sync::Arc;
 
 /// A pipeline that executes a sequence of steps
 #[derive(Clone)]

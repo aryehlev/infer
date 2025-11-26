@@ -35,21 +35,21 @@
 //! let output = registry.predict("model1", &input).unwrap();
 //! ```
 
+pub mod backends;
 pub mod error;
 pub mod model;
-pub mod registry;
-pub mod backends;
 pub mod polars_ext;
+pub mod registry;
 
 // Re-export commonly used types
 pub use error::{InferError, Result};
 pub use model::{
-    Model, ModelBackend, ModelInput, ModelOutput, ModelMetadata, DynModel,
-    PreprocessingPipeline, DynPreprocessingPipeline, InferenceResult, InferenceMetadata,
-    DataFrameTransformer, DynDataFrameTransformer,
+    DataFrameTransformer, DynDataFrameTransformer, DynModel, DynPreprocessingPipeline,
+    InferenceMetadata, InferenceResult, Model, ModelBackend, ModelInput, ModelMetadata,
+    ModelOutput, PreprocessingPipeline,
 };
-pub use registry::ModelRegistry;
 pub use polars_ext::{dataframe_to_dense_f32, output_to_series};
+pub use registry::ModelRegistry;
 
 // Re-export backend types when features are enabled
 #[cfg(feature = "catboost")]
@@ -74,12 +74,12 @@ pub use backends::CandleModel;
 pub mod prelude {
     pub use crate::error::{InferError, Result};
     pub use crate::model::{
-        Model, ModelBackend, ModelInput, ModelOutput, DynModel,
-        PreprocessingPipeline, DynPreprocessingPipeline, InferenceResult, InferenceMetadata,
-        DataFrameTransformer, DynDataFrameTransformer,
+        DataFrameTransformer, DynDataFrameTransformer, DynModel, DynPreprocessingPipeline,
+        InferenceMetadata, InferenceResult, Model, ModelBackend, ModelInput, ModelOutput,
+        PreprocessingPipeline,
     };
+    pub use crate::polars_ext::{dataframe_to_dense_f32, output_to_series};
     pub use crate::registry::ModelRegistry;
-    pub use crate::polars_ext::DataFrameExt;
 
     #[cfg(feature = "catboost")]
     pub use crate::backends::CatBoostModel;
