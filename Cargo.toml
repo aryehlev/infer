@@ -1,0 +1,49 @@
+[package]
+name = "infer"
+version = "0.1.0"
+edition = "2024"
+description = "High-performance ML inference library supporting CatBoost, XGBoost, and LightGBM with parallel execution and Polars integration"
+license = "Apache-2.0"
+repository = "https://github.com/aryehlev/infer"
+keywords = ["machine-learning", "inference", "catboost", "xgboost", "lightgbm"]
+categories = ["science"]
+rust-version = "1.85"
+
+[dependencies]
+# Core dependencies
+arc-swap = "1.7"
+thiserror = "2.0"
+rayon = "1.10"
+
+# Polars support
+polars = { version = "0.45", features = ["lazy", "dtype-full"] }
+
+# ML backends - using local paths for development
+catboost-rust = { path = "../catboost-rust", features = ["polars"] }
+xgboost-rust = { path = "../xgboost-rust", features = ["polars"] }
+lightgbm-rust = { path = "../lightgbm-rust", features = ["polars"] }
+
+# Optional perpetual support for future integration
+# perpetual = { version = "0.1", optional = true }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[features]
+default = ["catboost", "xgboost", "lightgbm"]
+catboost = []
+xgboost = []
+lightgbm = []
+# perpetual = ["dep:perpetual"]
+
+[[example]]
+name = "basic_usage"
+path = "examples/basic_usage.rs"
+
+[[example]]
+name = "parallel_inference"
+path = "examples/parallel_inference.rs"
+
+[[example]]
+name = "polars_integration"
+path = "examples/polars_integration.rs"
