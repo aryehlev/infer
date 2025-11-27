@@ -132,9 +132,12 @@ mod tests {
     use super::*;
     use crate::pipeline::context::ContextData;
 
+    /// Type alias for test step action functions
+    type TestActionFn = dyn Fn(&mut ExecutionContext) -> Result<StepResult> + Send + Sync;
+
     struct TestStep {
         name: String,
-        action: Arc<dyn Fn(&mut ExecutionContext) -> Result<StepResult> + Send + Sync>,
+        action: Arc<TestActionFn>,
     }
 
     impl TestStep {

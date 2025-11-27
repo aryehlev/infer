@@ -43,8 +43,8 @@ pub use infer_lib::{
 };
 
 pub use pipeline::{
+    builder::{Pipeline, PipelineBuilder},
     context::{ContextData, ExecutionContext},
-    pipeline::{Pipeline, PipelineBuilder},
     step::{
         ConditionalStep, DynPipelineStep, ParallelStep, PipelineStep, SequenceStep, StepResult,
     },

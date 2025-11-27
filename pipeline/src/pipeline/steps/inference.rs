@@ -154,16 +154,20 @@ pub struct EnsembleStep {
     method: EnsembleMethod,
 }
 
-/// Ensemble methods
+/// Ensemble methods for combining predictions from multiple models.
 #[derive(Debug, Clone, Copy)]
 pub enum EnsembleMethod {
-    /// Average predictions
+    /// Average predictions (equal weight for all models)
     Average,
-    /// Weighted average (weights must match number of models)
+    /// Weighted average of predictions.
+    ///
+    /// **Note**: Weight specification is not yet implemented. Currently behaves
+    /// identically to `Average`. A future version will add a `weights` parameter
+    /// to `EnsembleStep::new()` for specifying per-model weights.
     WeightedAverage,
-    /// Take maximum prediction
+    /// Take the maximum prediction across all models (per row)
     Max,
-    /// Take minimum prediction
+    /// Take the minimum prediction across all models (per row)
     Min,
 }
 
@@ -329,6 +333,8 @@ mod tests {
 
     #[test]
     fn test_inference_step() {
+        use polars::prelude::*;
+
         let registry = Arc::new(ModelRegistry::new());
         registry.register(
             "model1".to_string(),
@@ -346,15 +352,15 @@ mod tests {
             "output",
         );
 
+        // Create a DataFrame as input
+        let df = df! {
+            "feature1" => [1.0f32, 2.0],
+            "feature2" => [3.0f32, 4.0],
+        }
+        .unwrap();
+
         let mut ctx = ExecutionContext::new();
-        ctx.insert(
-            "input",
-            ContextData::ModelInput(ModelInput::DenseF32 {
-                data: vec![1.0, 2.0],
-                num_rows: 1,
-                num_features: 2,
-            }),
-        );
+        ctx.insert("input", ContextData::ModelInput(ModelInput(df)));
 
         step.execute(&mut ctx).unwrap();
 

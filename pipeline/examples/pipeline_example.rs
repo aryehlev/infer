@@ -1,6 +1,6 @@
 /// Example showing how to use the execution engine for ML pipelines
-use infer_lib::prelude::*;
-use infer_lib::steps::*;
+use infer_pipeline::prelude::*;
+use infer_pipeline::steps::*;
 use polars::prelude::*;
 use std::sync::Arc;
 
@@ -20,26 +20,24 @@ impl Model for DemoModel {
     }
 
     fn predict(&self, input: &ModelInput) -> Result<ModelOutput> {
-        let (data, num_rows) = match input {
-            ModelInput::DenseF32 { data, num_rows, .. } => (data.clone(), *num_rows),
-            ModelInput::DataFrame(df) => {
-                let input = df.to_model_input()?;
-                match input {
-                    ModelInput::DenseF32 { data, num_rows, .. } => (data, num_rows),
-                    _ => unreachable!(),
-                }
-            }
-            _ => {
-                return Err(InferError::Other(
-                    "Example model only supports DenseF32 and DataFrame inputs".to_string(),
-                ))
-            }
-        };
+        let df = &input.0;
+        let num_rows = df.height();
 
-        // Simple prediction: sum of features * multiplier
-        let predictions: Vec<f64> = data
-            .chunks(data.len() / num_rows)
-            .map(|row| row.iter().map(|&x| x as f64).sum::<f64>() * self.multiplier)
+        // Sum all columns for each row and multiply by multiplier
+        let predictions: Vec<f64> = (0..num_rows)
+            .map(|row_idx| {
+                let mut sum = 0.0f64;
+                for col in df.get_columns() {
+                    if let Ok(val) = col.get(row_idx) {
+                        if let Ok(f) = val.try_extract::<f64>() {
+                            sum += f;
+                        } else if let Ok(f) = val.try_extract::<f32>() {
+                            sum += f as f64;
+                        }
+                    }
+                }
+                sum * self.multiplier
+            })
             .collect();
 
         Ok(ModelOutput::Single(predictions))
@@ -96,7 +94,7 @@ fn main() -> Result<()> {
 fn simple_pipeline_example(registry: Arc<ModelRegistry>) -> Result<()> {
     // Create a simple pipeline that loads data and runs inference
     let pipeline = Pipeline::builder("simple_pipeline")
-        .add_fn("load_data", |ctx| {
+        .add_fn("load_data", |ctx: &mut ExecutionContext| {
             println!("  Step 1: Loading data...");
             let df = df! {
                 "feature1" => [1.0f32, 2.0, 3.0],
@@ -112,14 +110,11 @@ fn simple_pipeline_example(registry: Arc<ModelRegistry>) -> Result<()> {
             "data",
             "predictions",
         )))
-        .add_fn("display_results", |ctx| {
+        .add_fn("display_results", |ctx: &mut ExecutionContext| {
             println!("  Step 3: Displaying results...");
             let output = ctx.get("predictions").unwrap().as_model_output().unwrap();
-            match output {
-                ModelOutput::Single(preds) => {
-                    println!("  Predictions: {:?}", preds);
-                }
-                _ => {}
+            if let ModelOutput::Single(preds) = output {
+                println!("  Predictions: {:?}", preds);
             }
             Ok(StepResult::Continue)
         })
@@ -134,7 +129,7 @@ fn simple_pipeline_example(registry: Arc<ModelRegistry>) -> Result<()> {
 fn conditional_pipeline_example(registry: Arc<ModelRegistry>) -> Result<()> {
     // Create a pipeline with conditional branching
     let pipeline = Pipeline::builder("conditional_pipeline")
-        .add_fn("load_data", |ctx| {
+        .add_fn("load_data", |ctx: &mut ExecutionContext| {
             println!("  Step 1: Loading data...");
             let df = df! {
                 "feature1" => [10.0f32, 20.0, 30.0],
@@ -144,7 +139,7 @@ fn conditional_pipeline_example(registry: Arc<ModelRegistry>) -> Result<()> {
             ctx.insert("use_v2", ContextData::Bool(true));
             Ok(StepResult::Continue)
         })
-        .add_fn("choose_model", |ctx| {
+        .add_fn("choose_model", |ctx: &mut ExecutionContext| {
             println!("  Step 2: Choosing model based on condition...");
             let use_v2 = ctx.get("use_v2").and_then(|d| d.as_bool()).unwrap_or(false);
             if use_v2 {
@@ -162,7 +157,7 @@ fn conditional_pipeline_example(registry: Arc<ModelRegistry>) -> Result<()> {
             "data",
             "predictions",
         )))
-        .add_fn("skip_v2", |_ctx| {
+        .add_fn("skip_v2", |_ctx: &mut ExecutionContext| {
             Ok(StepResult::Skip("display".to_string()))
         })
         .add_step(Arc::new(InferenceStep::new(
@@ -172,14 +167,11 @@ fn conditional_pipeline_example(registry: Arc<ModelRegistry>) -> Result<()> {
             "data",
             "predictions",
         )))
-        .add_fn("display", |ctx| {
+        .add_fn("display", |ctx: &mut ExecutionContext| {
             println!("  Final Step: Displaying results...");
             let output = ctx.get("predictions").unwrap().as_model_output().unwrap();
-            match output {
-                ModelOutput::Single(preds) => {
-                    println!("  Predictions: {:?}", preds);
-                }
-                _ => {}
+            if let ModelOutput::Single(preds) = output {
+                println!("  Predictions: {:?}", preds);
             }
             Ok(StepResult::Continue)
         })
@@ -194,7 +186,7 @@ fn conditional_pipeline_example(registry: Arc<ModelRegistry>) -> Result<()> {
 fn parallel_inference_example(registry: Arc<ModelRegistry>) -> Result<()> {
     // Run multiple models in parallel and ensemble the results
     let pipeline = Pipeline::builder("parallel_pipeline")
-        .add_fn("load_data", |ctx| {
+        .add_fn("load_data", |ctx: &mut ExecutionContext| {
             println!("  Step 1: Loading data...");
             let df = df! {
                 "feature1" => [5.0f32, 10.0],
@@ -216,7 +208,7 @@ fn parallel_inference_example(registry: Arc<ModelRegistry>) -> Result<()> {
             "final_predictions",
             EnsembleMethod::Average,
         )))
-        .add_fn("display_results", |ctx| {
+        .add_fn("display_results", |ctx: &mut ExecutionContext| {
             println!("  Step 4: Displaying results...");
             println!(
                 "  Model v1 predictions: {:?}",
@@ -260,7 +252,7 @@ fn complete_workflow_example(registry: Arc<ModelRegistry>) -> Result<()> {
     }
 
     let pipeline = Pipeline::builder("complete_workflow")
-        .add_fn("load_data", |ctx| {
+        .add_fn("load_data", |ctx: &mut ExecutionContext| {
             println!("  Step 1: Loading raw data...");
             let df = df! {
                 "feature1" => [50.0f32, 100.0, 150.0],
@@ -289,7 +281,7 @@ fn complete_workflow_example(registry: Arc<ModelRegistry>) -> Result<()> {
             "final_data",
             "pred",
         )))
-        .add_fn("display_final", |ctx| {
+        .add_fn("display_final", |ctx: &mut ExecutionContext| {
             println!("  Step 5: Final results...");
             let df = ctx.get("final_data").unwrap().as_dataframe().unwrap();
             println!("{}", df);

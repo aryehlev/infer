@@ -117,7 +117,26 @@ impl PipelineStep for SequenceStep {
     }
 }
 
-/// A step that executes multiple steps in parallel
+/// A step that executes multiple steps in parallel using rayon.
+///
+/// # Context Merging Behavior
+///
+/// Each parallel branch receives a clone of the current context. After all branches
+/// complete, their contexts are merged back into the main context.
+///
+/// **Important**: If multiple parallel steps write to the same key, the final value
+/// is non-deterministic (last-write-wins based on execution order). To avoid conflicts:
+/// - Use unique output keys for each parallel branch (e.g., `"pred_model_a"`, `"pred_model_b"`)
+/// - Or use a prefix/suffix pattern based on the step name
+///
+/// # Example
+///
+/// ```ignore
+/// let parallel = ParallelStep::new("parallel_inference", vec![
+///     Arc::new(InferenceStep::new("model_a", registry.clone(), "model_a", "input", "pred_a")),
+///     Arc::new(InferenceStep::new("model_b", registry.clone(), "model_b", "input", "pred_b")),
+/// ]);
+/// ```
 pub struct ParallelStep {
     name: String,
     steps: Vec<DynPipelineStep>,
@@ -183,9 +202,12 @@ mod tests {
     use super::*;
     use crate::pipeline::context::ContextData;
 
+    /// Type alias for test step action functions
+    type TestActionFn = dyn Fn(&mut ExecutionContext) -> Result<StepResult> + Send + Sync;
+
     struct TestStep {
         name: String,
-        action: Arc<dyn Fn(&mut ExecutionContext) -> Result<StepResult> + Send + Sync>,
+        action: Arc<TestActionFn>,
     }
 
     impl TestStep {
