@@ -1,18 +1,20 @@
 # Infer-Lib
 
-A high-performance ML inference library for Rust with an integrated execution engine for building ML pipelines and RAG (Retrieval-Augmented Generation) workflows. Supports multiple gradient boosting frameworks (CatBoost, XGBoost, LightGBM, Perpetual) with first-class Polars integration and parallel execution capabilities.
+A high-performance ML inference library for Rust with native Polars DataFrame support. Provides a unified interface for multiple gradient boosting frameworks (CatBoost, XGBoost, LightGBM, Perpetual) with parallel execution and zero-downtime model updates.
+
+[![Build Status](https://github.com/aryehlev/infer-lib/workflows/CI/badge.svg)](https://github.com/aryehlev/infer-lib/actions)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 ## Features
 
-- 🚀 **Multiple ML Backends**: Unified interface for CatBoost, XGBoost, LightGBM, and Perpetual
-- 🔀 **Execution Engine**: Build complex ML pipelines with conditional branching and parallel execution
-- 📚 **RAG Support**: Built-in pipeline steps for retrieval-augmented generation workflows
-- 🔒 **Lock-Free Model Registry**: Uses `ArcSwap` for atomic model updates without blocking inference
+- 🚀 **Multiple ML Backends**: Unified interface for CatBoost, XGBoost, LightGBM, Perpetual, ONNX, and Candle
+- 🐻‍❄️ **Polars-Native**: First-class Polars DataFrame support with zero-copy Arrow transfer
+- 🔒 **Lock-Free Registry**: Uses `ArcSwap` for atomic model updates without blocking inference
 - ⚡ **Parallel Inference**: Run inference on multiple models simultaneously using Rayon
-- 🐻‍❄️ **Polars Integration**: Native support for Polars DataFrames with zero-copy Arrow transfer
 - 🛡️ **Type-Safe**: Strongly typed API with comprehensive error handling
 - 🔄 **Zero-Downtime Updates**: Swap models atomically while serving predictions
-- 🔧 **DataFrame Transformers**: Apply transformations to DataFrames before inference
+- 🔧 **DataFrame Transformers**: Apply preprocessing transformations before inference
+- 📦 **Execution Engine**: Build complex ML pipelines with the integrated pipeline framework
 
 ## Installation
 
@@ -20,91 +22,119 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-infer-lib = { path = "../infer-lib" }
+infer-lib = { git = "https://github.com/aryehlev/infer-lib" }
 ```
 
 Or with specific features:
 
 ```toml
 [dependencies]
-infer-lib = { path = "../infer-lib", features = ["catboost", "xgboost"] }
+infer-lib = { git = "https://github.com/aryehlev/infer-lib", features = ["catboost", "xgboost"] }
 ```
 
-Available features:
-- `catboost` - Enable CatBoost support
-- `xgboost` - Enable XGBoost support
-- `lightgbm` - Enable LightGBM support
-- `perpetual` - Enable Perpetual support
-- `default` - Enables all backends
+**Available features:**
+- `catboost` - CatBoost support with native Polars integration
+- `xgboost` - XGBoost support with native Polars integration
+- `lightgbm` - LightGBM support with native Polars integration
+- `perpetual` - Perpetual gradient boosting (pure Rust)
+- `onnx` - ONNX Runtime support for deep learning models
+- `candle` - Candle support for transformers and LLMs
 
 ## Quick Start
 
 ### Basic Usage
 
 ```rust
-use infer::prelude::*;
+use infer_lib::prelude::*;
+use polars::prelude::*;
 
 fn main() -> Result<()> {
     // Create a model registry
     let registry = ModelRegistry::new();
 
-    // Load and register models
-    let xgb_model = XGBoostModel::load("xgb".to_string(), "model.json")?;
-    registry.register("xgb".to_string(), xgb_model);
+    // Load and register a model
+    let model = XGBoostModel::load("xgb", "model.json")?;
+    registry.register("xgb", model);
 
-    // Prepare input data
-    let input = ModelInput::DenseF32 {
-        data: vec![1.0, 2.0, 3.0, 4.0],
-        num_rows: 2,
-        num_features: 2,
-    };
+    // Create input DataFrame
+    let df = df! {
+        "feature1" => [1.0f32, 2.0, 3.0],
+        "feature2" => [4.0f32, 5.0, 6.0],
+    }?;
 
-    // Run inference
+    // Run inference (Polars-native!)
+    let input = ModelInput(df);
     let output = registry.predict("xgb", &input)?;
-    println!("Predictions: {:?}", output.as_slice());
 
+    println!("Predictions: {:?}", output);
     Ok(())
 }
 ```
 
 ### Polars Integration
 
+Infer-Lib uses Polars DataFrames natively. All backends that support it use **zero-copy Arrow transfer** for maximum performance.
+
 ```rust
 use infer_lib::prelude::*;
+use infer_lib::polars_ext::output_to_series;
 use polars::prelude::*;
 
 fn main() -> Result<()> {
     // Create a DataFrame
     let df = df! {
-        "feature1" => [1.0f32, 2.0, 3.0],
-        "feature2" => [4.0f32, 5.0, 6.0],
+        "sepal_length" => [5.1f32, 4.9, 4.7],
+        "sepal_width" => [3.5f32, 3.0, 3.2],
+        "petal_length" => [1.4f32, 1.4, 1.3],
+        "petal_width" => [0.2f32, 0.2, 0.2],
     }?;
 
-    // Convert to model input
-    let input = df.to_model_input()?;
+    // Wrap in ModelInput
+    let input = ModelInput(df);
 
-    // Run inference (assuming a model is registered)
+    // Run inference
     let registry = ModelRegistry::new();
-    // ... register models ...
-    let output = registry.predict("my_model", &input)?;
+    // ... register your model ...
+    let output = registry.predict("iris_model", &input)?;
 
     // Convert predictions back to Polars Series
     let predictions = output_to_series(&output, "predictions")?;
 
+    // Add predictions to your DataFrame
+    let mut result_df = input.0.clone();
+    result_df.with_column(predictions)?;
+
+    println!("{}", result_df);
     Ok(())
 }
 ```
 
 ### DataFrame Transformers
 
-Infer-Lib supports two approaches for data transformations:
+Apply preprocessing transformations at the model level:
 
-**1. Model-Level Transformers** (for required preprocessing):
 ```rust
-// Transformations that are ALWAYS needed for this model
+use infer_lib::prelude::*;
+use std::sync::Arc;
+
+// Define a custom transformer
+struct StandardScaler;
+
+impl DataFrameTransformer for StandardScaler {
+    fn transform(&self, df: DataFrame) -> Result<DataFrame> {
+        // Apply standardization to numeric columns
+        // ... transformation logic ...
+        Ok(df)
+    }
+
+    fn name(&self) -> &str {
+        "StandardScaler"
+    }
+}
+
+// Attach transformers to models
 let model = XGBoostModel::load("model", "model.json")?
-    .with_transformer(Arc::new(StandardScaler))  // Required normalization
-    .with_transformer(Arc::new(FeatureEncoder)); // Required encoding
+    .with_transformer(Arc::new(StandardScaler));
 
 registry.register("model", model);
 
@@ -112,287 +142,223 @@ registry.register("model", model);
 let output = registry.predict("model", &input)?;
 ```
 
-**When to use:** Required preprocessing that the model was trained with (e.g., specific normalization, encoding). These transformations are always applied.
+**When to use model-level transformers:**
+- Required preprocessing that the model was trained with
+- Normalization/standardization that's always needed
+- Feature engineering specific to this model
 
-**2. Pipeline-Level Transformers** (for flexible workflows):
+### Parallel Inference
+
+Run multiple models in parallel for A/B testing or ensembles:
+
 ```rust
-// Flexible transformation pipeline
-let pipeline = Pipeline::builder("workflow")
-    .add_step(Arc::new(TransformStep::new(
-        "scale",
-        Arc::new(StandardScaler),
-        "raw_data",
-        "scaled_data",
-    )))
+use infer_lib::prelude::*;
+
+fn main() -> Result<()> {
+    let registry = ModelRegistry::new();
+
+    // Register multiple model versions
+    registry.register("model_v1", model_v1);
+    registry.register("model_v2", model_v2);
+    registry.register("model_v3", model_v3);
+
+    // Broadcast same input to multiple models (A/B testing)
+    let model_ids = vec!["model_v1", "model_v2", "model_v3"];
+    let results = registry.predict_broadcast(&model_ids, &input);
+
+    for (model_id, result) in results {
+        match result {
+            Ok(output) => println!("{}: {:?}", model_id, output),
+            Err(e) => eprintln!("{}: Error - {}", model_id, e),
+        }
+    }
+
+    Ok(())
+}
+```
+
+## Architecture
+
+### Polars-Native Design
+
+All backends use Polars DataFrames as the primary input format:
+
+```rust
+pub struct ModelInput(pub DataFrame);
+
+pub enum ModelOutput {
+    Single(Vec<f64>),           // Regression/binary classification
+    Multi {                      // Multiclass probabilities
+        data: Vec<f64>,
+        num_classes: usize
+    },
+    Text(Vec<String>),          // Text generation
+    Embeddings {                // Vector embeddings
+        data: Vec<f32>,
+        embedding_dim: usize
+    },
+    // ... and more output types
+}
+```
+
+### Backend Support
+
+| Backend | Thread Safety | Polars Support | Notes |
+|---------|--------------|----------------|-------|
+| **CatBoost** | ✅ Native | ✅ Zero-copy Arrow | Native Polars integration |
+| **XGBoost** | ✅ v1.4+ | ✅ Zero-copy Arrow | Native Polars integration |
+| **LightGBM** | ✅ Mutex | ✅ Zero-copy Arrow | Native Polars integration |
+| **Perpetual** | ✅ Native | ✅ Conversion | Pure Rust, DataFrame→ndarray |
+| **ONNX** | ✅ Native | 🚧 Conversion | Via dense f32 conversion |
+| **Candle** | ✅ Native | 🚧 Conversion | Via dense f32 conversion |
+
+### Model Registry (Lock-Free)
+
+The `ModelRegistry` uses `ArcSwap` for lock-free, thread-safe operations:
+
+```rust
+// ✅ Lock-free reads - inference doesn't block
+let model = registry.get("model_v2")?;
+
+// ✅ Atomic updates - swap models without downtime
+registry.register("model_v2", new_model);
+
+// ✅ Thread-safe - safe to share across threads
+let registry = Arc::new(ModelRegistry::new());
+```
+
+**Benefits:**
+- **Lock-free reads**: Predictions never block each other
+- **Atomic updates**: Model swaps are instant and safe
+- **Zero downtime**: Update models while serving traffic
+- **Thread-safe**: Share registry across threads
+
+## Examples
+
+Check out the `lib/examples/` directory:
+
+```bash
+# Basic usage with XGBoost
+cargo run --example basic_usage --features xgboost
+
+# Parallel inference patterns
+cargo run --example parallel_inference --features "xgboost catboost"
+
+# Polars DataFrame integration
+cargo run --example polars_integration --features xgboost
+```
+
+## Performance
+
+### Optimization Tips
+
+1. **Use Polars-native backends** (CatBoost, XGBoost, LightGBM) for zero-copy Arrow transfer
+2. **Load models once** and reuse via the registry
+3. **Leverage parallel execution** for multiple models using `predict_broadcast`
+4. **Enable LTO** in release builds for maximum performance
+
+### Memory Efficiency
+
+- Models are reference-counted (`Arc`) - cloning is cheap
+- Lock-free reads mean no mutex contention
+- Zero-copy Arrow transfer for Polars-native backends
+- Efficient parallel execution with Rayon's work-stealing
+
+### Polars Arrow Optimization
+
+See [POLARS_ARROW_OPTIMIZATION.md](POLARS_ARROW_OPTIMIZATION.md) for detailed information about zero-copy Arrow transfers and performance benchmarks.
+
+## Pipeline Framework
+
+Build complex ML workflows with the execution engine (in the `pipeline` crate):
+
+```rust
+use infer_pipeline::prelude::*;
+use std::sync::Arc;
+
+let pipeline = Pipeline::builder("ml_workflow")
     .add_step(Arc::new(InferenceStep::new(
         "predict",
-        registry,
-        "model",
-        "scaled_data",
+        Arc::clone(&registry),
+        "model_v1",
+        "input_data",
         "predictions",
     )))
     .build();
 
 let mut ctx = ExecutionContext::new();
-ctx.insert("raw_data", ContextData::DataFrame(df));
+ctx.insert("input_data", ContextData::DataFrame(df));
 pipeline.execute(&mut ctx)?;
 ```
 
-**When to use:** Experimental preprocessing, A/B testing different transformations, composable workflows, or when different use cases need different preprocessing for the same model.
+**Pipeline features:**
+- Conditional branching
+- Parallel execution
+- Built-in steps for inference, transforms, ensembles
+- RAG workflow support
 
-**Best Practice:** Use model-level transformers for required preprocessing, and pipeline-level transformers for flexible composition.
+## Testing
 
-### Parallel Inference
-
-```rust
-use infer::prelude::*;
-
-fn main() -> Result<()> {
-    let registry = ModelRegistry::new();
-    // ... register models ...
-
-    // Run multiple models in parallel with different inputs
-    let model_ids = vec!["model1", "model2", "model3"];
-    let inputs = vec![input1, input2, input3];
-
-    let results = registry.predict_many(&model_ids, &inputs);
-    for (model_id, result) in results {
-        println!("{}: {:?}", model_id, result);
-    }
-
-    // Broadcast same input to multiple models (useful for A/B testing)
-    let results = registry.predict_broadcast(&model_ids, &input);
-
-    Ok(())
-}
-```
-
-### Execution Engine & Pipelines
-
-Build complex ML workflows using the integrated execution engine:
-
-```rust
-use infer_lib::prelude::*;
-use infer_lib::steps::*;
-use std::sync::Arc;
-
-fn main() -> Result<()> {
-    // Set up model registry
-    let registry = Arc::new(ModelRegistry::new());
-    // ... register models ...
-
-    // Create a pipeline with multiple steps
-    let pipeline = Pipeline::builder("ml_workflow")
-        .add_fn("load_data", |ctx| {
-            let df = df! {
-                "feature1" => [1.0f32, 2.0, 3.0],
-                "feature2" => [4.0f32, 5.0, 6.0],
-            }?;
-            ctx.insert("data", ContextData::DataFrame(df));
-            Ok(StepResult::Continue)
-        })
-        .add_step(Arc::new(InferenceStep::new(
-            "predict",
-            Arc::clone(&registry),
-            "model1",
-            "data",
-            "predictions",
-        )))
-        .add_step(Arc::new(EnsembleStep::new(
-            "ensemble",
-            vec!["pred1".to_string(), "pred2".to_string()],
-            "final_predictions",
-            EnsembleMethod::Average,
-        )))
-        .build();
-
-    // Execute the pipeline
-    let mut ctx = ExecutionContext::new();
-    pipeline.execute(&mut ctx)?;
-
-    Ok(())
-}
-```
-
-**Built-in Pipeline Steps:**
-- **InferenceStep**: Run model inference
-- **ParallelInferenceStep**: Run multiple models in parallel
-- **EnsembleStep**: Combine predictions from multiple models
-- **TransformStep**: Apply DataFrame transformations
-- **FilterStep**: Filter DataFrames based on conditions
-- **SelectColumnsStep**: Select specific columns
-- **AddPredictionColumnStep**: Add predictions to DataFrame
-
-**Control Flow:**
-- **Conditional branching**: Use `StepResult::Skip(target)` to jump to specific steps
-- **Early stopping**: Use `StepResult::Stop` to halt execution
-- **Parallel execution**: Use `ParallelStep` for concurrent operations
-
-### RAG (Retrieval-Augmented Generation) Support
-
-Built-in pipeline steps for RAG workflows:
-
-```rust
-use infer_lib::steps::*;
-
-// Create a RAG pipeline
-let rag_pipeline = Pipeline::builder("rag_workflow")
-    .add_step(Arc::new(RetrievalStep::new(
-        "retrieve",
-        retriever,
-        "query",
-        "documents",
-        top_k: 5,
-    )))
-    .add_step(Arc::new(RankingStep::new(
-        "rerank",
-        ranker,
-        "query",
-        "documents",
-        "ranked_docs",
-    )))
-    .add_step(Arc::new(ScoreFilterStep::new(
-        "filter",
-        "ranked_docs",
-        "filtered_docs",
-        threshold: 0.7,
-    )))
-    .add_step(Arc::new(PromptConstructionStep::new(
-        "construct_prompt",
-        "query",
-        "filtered_docs",
-        "prompt",
-        "Query: {query}\n\nContext:\n{documents}",
-    )))
-    .build();
-```
-
-**RAG Pipeline Steps:**
-- **RetrievalStep**: Retrieve documents based on query
-- **RankingStep**: Rank/rerank documents
-- **ScoreFilterStep**: Filter documents by relevance score
-- **PromptConstructionStep**: Build prompts from query and documents
-
-## Architecture
-
-### Model Registry (ArcSwap-based)
-
-The `ModelRegistry` uses `ArcSwap` to provide:
-- **Lock-free reads**: Inference operations don't block each other
-- **Atomic updates**: Models can be swapped without downtime
-- **Thread-safe**: Safe to share across threads
-
-```rust
-// Register/update models without blocking inference
-registry.register("model_v2".to_string(), new_model);
-
-// Get model (returns Arc clone, very cheap)
-let model = registry.get("model_v2")?;
-
-// Parallel execution across models
-registry.predict_many(&model_ids, &inputs);
-```
-
-### Supported Backends
-
-| Backend | Thread Safety | Multi-output | Polars Support | Notes |
-|---------|--------------|--------------|----------------|-------|
-| CatBoost | ✅ Native | ✅ | ✅ Zero-copy | Native Arrow transfer |
-| XGBoost | ✅ v1.4+ | ✅ | ✅ Zero-copy | Native Arrow transfer |
-| LightGBM | ✅ Mutex | ✅ | ✅ Zero-copy | Native Arrow transfer |
-| Perpetual | ✅ Native | ❌ | ✅ Via conversion | Pure Rust, DataFrame→Matrix |
-
-### ModelInput Types
-
-```rust
-pub enum ModelInput {
-    // Dense float matrix (row-major)
-    Dense {
-        data: Vec<f32>,
-        num_rows: usize,
-        num_features: usize,
-    },
-
-    // Polars DataFrame (auto-converted to Dense)
-    DataFrame(DataFrame),
-}
-```
-
-### ModelOutput Types
-
-```rust
-pub enum ModelOutput {
-    // Single prediction per row (regression/binary)
-    Single(Vec<f64>),
-
-    // Multiple predictions per row (multiclass)
-    Multi {
-        data: Vec<f64>,
-        num_classes: usize,
-    },
-}
-```
-
-## Examples
-
-Run the examples:
+Run the test suite:
 
 ```bash
-# Basic usage
-cargo run --example basic_usage
+# Run all tests
+cargo test --workspace --all-features
 
-# Parallel inference patterns
-cargo run --example parallel_inference
+# Run only lib tests
+cargo test --package infer-lib --all-features
 
-# Polars integration
-cargo run --example polars_integration
-
-# Pipeline and execution engine
-cargo run --example pipeline_example
+# Run with output
+cargo test --workspace --all-features -- --nocapture
 ```
 
-## Performance Considerations
+## Roadmap
 
-1. **Model Loading**: Load models once and reuse them via the registry
-2. **Parallel Execution**: Uses Rayon for work-stealing parallelism
-3. **Memory**: Models are reference-counted (Arc), so cloning is cheap
-4. **Lock-Free Reads**: Registry uses ArcSwap for lock-free model access during inference
-
-## Future Plans
-
-- [x] Add support for `perpetual` library integration
-- [x] DataFrame transformers for preprocessing
-- [x] Execution engine for building ML pipelines
-- [x] RAG (Retrieval-Augmented Generation) workflow support
-- [ ] Support for ONNX models
-- [ ] Batch prediction optimization
-- [ ] Model versioning and rollback
-- [ ] Metrics and monitoring integration
+- [x] Multiple gradient boosting backends
+- [x] Polars DataFrame integration with zero-copy Arrow
+- [x] Lock-free model registry with ArcSwap
+- [x] Parallel inference with Rayon
+- [x] DataFrame transformers
+- [x] Pipeline execution engine
+- [ ] ONNX Runtime full implementation
+- [ ] Candle transformers integration
 - [ ] Async inference API
-- [ ] Built-in vector database integration for RAG
-- [ ] Advanced ensemble methods (stacking, boosting)
-- [ ] Pipeline serialization/deserialization
+- [ ] Model versioning and rollback
+- [ ] Metrics and monitoring
+- [ ] Built-in vector database for RAG
+- [ ] Advanced ensemble methods
 
 ## Contributing
 
-This library is designed to be extensible. To add a new backend:
+Contributions are welcome! To add a new backend:
 
-1. Implement the `Model` trait for your backend
-2. Add backend-specific module in `src/backends/`
-3. Add feature flag in `Cargo.toml`
+1. Implement the `Model` trait in `lib/src/backends/`
+2. Add feature flag in `lib/Cargo.toml`
+3. Add tests in `lib/tests/`
 4. Update documentation
 
 ## License
 
-Apache-2.0
+Licensed under Apache License 2.0 - see [LICENSE](LICENSE) for details.
 
 ## Credits
 
-Built on top of:
-- [catboost-rust](https://github.com/aryehlev/catboost-rust)
-- [xgboost-rust](https://github.com/aryehlev/xgboost-rust)
-- [lightgbm-rust](https://github.com/aryehlev/lightgbm-rust)
-- [perpetual](https://github.com/perpetual-ml/perpetual)
-- [polars](https://github.com/pola-rs/polars)
-- [arc-swap](https://github.com/vorner/arc-swap)
-- [rayon](https://github.com/rayon-rs/rayon)
+Built with these excellent libraries:
+
+- **ML Backends:**
+  - [catboost-rust](https://github.com/aryehlev/catboost-rust) - CatBoost Rust bindings
+  - [xgboost-rust](https://github.com/aryehlev/xgboost-rust) - XGBoost Rust bindings
+  - [lightgbm-rust](https://github.com/aryehlev/lightgbm-rust) - LightGBM Rust bindings
+  - [perpetual](https://github.com/perpetual-ml/perpetual) - Pure Rust gradient boosting
+  - [ort](https://github.com/pykeio/ort) - ONNX Runtime bindings
+  - [candle](https://github.com/huggingface/candle) - Minimalist ML framework
+
+- **Core Infrastructure:**
+  - [polars](https://github.com/pola-rs/polars) - Fast DataFrame library
+  - [arc-swap](https://github.com/vorner/arc-swap) - Lock-free atomic Arc swapping
+  - [rayon](https://github.com/rayon-rs/rayon) - Data parallelism
+
+---
+
+**Documentation:** [docs.rs/infer-lib](https://docs.rs/infer-lib) (coming soon)
+**Repository:** [github.com/aryehlev/infer-lib](https://github.com/aryehlev/infer-lib)

@@ -1,0 +1,62 @@
+# Automatically label PRs based on changed files
+
+# Core library changes
+'lib':
+  - 'lib/src/**/*'
+  - 'lib/Cargo.toml'
+  - 'lib/tests/**/*'
+
+# Pipeline changes
+'pipeline':
+  - 'pipeline/src/**/*'
+  - 'pipeline/Cargo.toml'
+
+# Documentation changes
+'documentation':
+  - '**/*.md'
+  - 'lib/src/**/*.rs'  # Rust doc comments
+  - 'docs/**/*'
+
+# Test changes
+'tests':
+  - '**/*_test.rs'
+  - '**/*_tests.rs'
+  - 'lib/tests/**/*'
+  - 'pipeline/tests/**/*'
+
+# CI/CD changes
+'ci':
+  - '.github/**/*'
+  - '.github/workflows/**/*'
+
+# Dependencies
+'dependencies':
+  - '**/Cargo.toml'
+  - '**/Cargo.lock'
+
+# Backend changes
+'backend:catboost':
+  - '**/*catboost*'
+
+'backend:xgboost':
+  - '**/*xgboost*'
+
+'backend:lightgbm':
+  - '**/*lightgbm*'
+
+'backend:onnx':
+  - '**/*onnx*'
+
+'backend:candle':
+  - '**/*candle*'
+
+# Examples
+'examples':
+  - 'lib/examples/**/*'
+  - 'pipeline/examples/**/*'
+
+# Breaking changes (manual label, but helps catch them)
+'breaking-change':
+  - 'lib/src/model.rs'
+  - 'lib/src/error.rs'
+  - 'lib/src/registry.rs'

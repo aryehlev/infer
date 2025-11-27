@@ -1,0 +1,225 @@
+name: Pull Request
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Label PRs automatically
+  label:
+    name: Auto Label
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/labeler@v5
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Check PR title follows conventional commits
+  pr-title:
+    name: Check PR Title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            chore
+            ci
+          scopes: |
+            lib
+            pipeline
+            ci
+            deps
+          requireScope: false
+
+  # Quick sanity checks before running full CI
+  quick-check:
+    name: Quick Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Quick compile check
+        run: cargo check --workspace --all-features
+
+  # Check for common issues
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Check for TODO comments
+        run: |
+          if grep -r "TODO" lib/src pipeline/src --include="*.rs" | grep -v "ONNX\|API migration"; then
+            echo "⚠️  Found TODO comments in source code"
+            echo "Please resolve or track in an issue before merging"
+            exit 1
+          fi
+        continue-on-error: true
+
+      - name: Check for panic! in lib
+        run: |
+          if grep -r "panic!" lib/src --include="*.rs" | grep -v "test"; then
+            echo "❌ Found panic! in library code"
+            echo "Library code should not panic - use Result instead"
+            exit 1
+          fi
+
+      - name: Check for unwrap() in lib
+        run: |
+          if grep -r "\.unwrap()" lib/src --include="*.rs" | grep -v "test\|example"; then
+            echo "⚠️  Found .unwrap() in library code"
+            echo "Consider using ? or proper error handling"
+            exit 1
+          fi
+        continue-on-error: true
+
+  # Check dependencies
+  dependencies:
+    name: Dependency Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Check for unused dependencies
+        run: |
+          cargo install cargo-machete || true
+          cargo machete || true
+        continue-on-error: true
+
+      - name: Check for duplicate dependencies
+        run: |
+          cargo tree --workspace --all-features --duplicates
+        continue-on-error: true
+
+  # Performance regression check (if benchmarks exist)
+  benchmark:
+    name: Benchmark Check
+    runs-on: ubuntu-latest
+    if: false  # Enable when you have stable benchmarks
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run benchmarks
+        run: cargo bench --workspace --all-features -- --save-baseline pr-${{ github.event.pull_request.number }}
+        continue-on-error: true
+
+  # Size check - track binary size changes
+  size-check:
+    name: Binary Size
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release
+        run: cargo build --release --workspace
+
+      - name: Check binary sizes
+        run: |
+          echo "📦 Library sizes:"
+          ls -lh target/release/*.rlib 2>/dev/null || echo "No .rlib files found"
+          echo ""
+          echo "Total target size:"
+          du -sh target/release
+        continue-on-error: true
+
+  # Summary comment on PR
+  pr-comment:
+    name: PR Summary
+    needs: [quick-check, quality, dependencies]
+    runs-on: ubuntu-latest
+    if: always()
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Comment PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const quickCheck = '${{ needs.quick-check.result }}';
+            const quality = '${{ needs.quality.result }}';
+            const dependencies = '${{ needs.dependencies.result }}';
+
+            let status = '✅';
+            let message = 'All quick checks passed!';
+
+            if (quickCheck !== 'success' || quality !== 'success') {
+              status = '❌';
+              message = 'Some checks failed. Please review.';
+            }
+
+            const body = `## ${status} PR Quality Check
+
+            | Check | Status |
+            |-------|--------|
+            | Quick Check | ${quickCheck === 'success' ? '✅' : '❌'} |
+            | Code Quality | ${quality === 'success' ? '✅' : '⚠️'} |
+            | Dependencies | ${dependencies === 'success' ? '✅' : '⚠️'} |
+
+            ${message}
+
+            See [full CI results](${context.payload.repository.html_url}/actions/runs/${context.runId}) for details.`;
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('PR Quality Check')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }

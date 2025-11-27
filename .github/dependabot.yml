@@ -1,0 +1,59 @@
+version: 2
+updates:
+  # Enable version updates for Cargo dependencies
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "aryehlev"
+    labels:
+      - "dependencies"
+      - "rust"
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"
+    groups:
+      # Group all patch updates together
+      patch-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+      # Group ML backend updates
+      ml-backends:
+        patterns:
+          - "catboost-rust"
+          - "xgboost-rust"
+          - "lightgbm-rust"
+          - "perpetual"
+          - "ort"
+          - "candle*"
+      # Group Polars and Arrow updates
+      dataframe:
+        patterns:
+          - "polars*"
+          - "arrow*"
+      # Group development dependencies
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"
