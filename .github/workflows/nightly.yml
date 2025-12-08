@@ -16,7 +16,7 @@ jobs:
     name: Nightly Rust
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust nightly
         uses: dtolnay/rust-toolchain@nightly
@@ -46,7 +46,7 @@ jobs:
     name: MSRV Check (1.85)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust 1.85
         uses: dtolnay/rust-toolchain@master
@@ -76,7 +76,7 @@ jobs:
     name: Minimal Dependency Versions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust nightly
         uses: dtolnay/rust-toolchain@nightly
@@ -100,7 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     if: false  # Enable this when you add fuzz targets
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust nightly
         uses: dtolnay/rust-toolchain@nightly
